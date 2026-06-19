@@ -1,0 +1,43 @@
+{
+  "metadata": {
+    "version": "0.1.0-poc",
+    "warning": "Datos demostrativos. No usar para cálculos de ingeniería.",
+    "units": {"tc_k": "K", "pc_kpa": "kPa"}
+  },
+  "systems": [
+    {
+      "id": "cyclohexane_n_heptane",
+      "name": "Ciclohexano / n-Heptano",
+      "description": "Sistema binario casi ideal para validar el flujo de Raoult.",
+      "kind": "Casi ideal",
+      "available_models": ["Wilson", "Margules", "Van Laar"],
+      "components": [
+        {"id": "cyclohexane", "name": "Ciclohexano", "formula": "C6H12", "tc_k": 553.6, "pc_kpa": 4080.0, "omega": 0.209},
+        {"id": "n_heptane", "name": "n-Heptano", "formula": "C7H16", "tc_k": 540.2, "pc_kpa": 2740.0, "omega": 0.349}
+      ]
+    },
+    {
+      "id": "ethanol_toluene",
+      "name": "Etanol / Tolueno",
+      "description": "Sistema binario no ideal para visualizar un comportamiento azeotrópico demostrativo.",
+      "kind": "Azeotrópico",
+      "available_models": ["Wilson", "Margules", "Van Laar"],
+      "components": [
+        {"id": "ethanol", "name": "Etanol", "formula": "C2H6O", "tc_k": 514.0, "pc_kpa": 6137.0, "omega": 0.644},
+        {"id": "toluene", "name": "Tolueno", "formula": "C7H8", "tc_k": 591.8, "pc_kpa": 4100.0, "omega": 0.264}
+      ]
+    },
+    {
+      "id": "acetone_methanol_benzene",
+      "name": "Acetona / Metanol / Benceno",
+      "description": "Sistema ternario para comprobar tablas y composiciones multicomponente.",
+      "kind": "Multicomponente",
+      "available_models": ["Wilson", "Margules", "Van Laar"],
+      "components": [
+        {"id": "acetone", "name": "Acetona", "formula": "C3H6O", "tc_k": 508.1, "pc_kpa": 4700.0, "omega": 0.307},
+        {"id": "methanol", "name": "Metanol", "formula": "CH4O", "tc_k": 512.6, "pc_kpa": 8096.0, "omega": 0.565},
+        {"id": "benzene", "name": "Benceno", "formula": "C6H6", "tc_k": 562.2, "pc_kpa": 4890.0, "omega": 0.212}
+      ]
+    }
+  ]
+}

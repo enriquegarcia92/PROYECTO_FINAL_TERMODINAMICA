@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mplconfig/
+.pyinstaller/
+build/
+dist/
+*.egg-info/
+resultados/*.png
+resultados/*.pdf
+!resultados/.gitkeep

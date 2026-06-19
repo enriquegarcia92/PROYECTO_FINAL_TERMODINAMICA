@@ -1,0 +1,568 @@
+"""Interfaz PySide6 completa de la POC."""
+
+from __future__ import annotations
+
+from datetime import datetime
+import os
+from pathlib import Path
+
+_MPL_CONFIG = Path(__file__).resolve().parents[1] / ".mplconfig"
+_MPL_CONFIG.mkdir(parents=True, exist_ok=True)
+os.environ.setdefault("MPLCONFIGDIR", str(_MPL_CONFIG))
+
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QBrush, QColor
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QApplication,
+    QButtonGroup,
+    QComboBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QFrame,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QSpinBox,
+    QStackedWidget,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
+from .domain import ActivityModel, CalculationRequest, CalculationResult, CalculationType, VaporModel
+from .paths import results_dir
+from .repository import DataRepository
+from .service import MockVLEService, SIMULATION_WARNING
+from .styles import APP_STYLE
+from .validation import InputValidationError
+
+
+def page_header(title: str, description: str) -> QVBoxLayout:
+    layout = QVBoxLayout()
+    title_label = QLabel(title)
+    title_label.setObjectName("pageTitle")
+    description_label = QLabel(description)
+    description_label.setObjectName("pageDescription")
+    description_label.setWordWrap(True)
+    layout.addWidget(title_label)
+    layout.addWidget(description_label)
+    layout.addSpacing(8)
+    return layout
+
+
+def warning_banner() -> QLabel:
+    label = QLabel(f"⚠  {SIMULATION_WARNING}")
+    label.setObjectName("warningBanner")
+    label.setWordWrap(True)
+    return label
+
+
+def card(title: str, value: str) -> QFrame:
+    frame = QFrame()
+    frame.setObjectName("card")
+    layout = QVBoxLayout(frame)
+    label = QLabel(title)
+    label.setObjectName("metricLabel")
+    metric = QLabel(value)
+    metric.setObjectName("metricValue")
+    layout.addWidget(label)
+    layout.addWidget(metric)
+    frame.metric_label = metric  # type: ignore[attr-defined]
+    return frame
+
+
+class HomePage(QWidget):
+    navigate = Signal(int)
+
+    def __init__(self, repository: DataRepository) -> None:
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.addLayout(page_header("VLE Gamma-Phi", "Prueba de concepto para diseñar y validar la aplicación final."))
+        layout.addWidget(warning_banner())
+        metrics = QHBoxLayout()
+        metrics.addWidget(card("Cálculos previstos", "4"))
+        metrics.addWidget(card("Sistemas demo", str(len(repository.all_systems()))))
+        metrics.addWidget(card("Modelos gamma", "3"))
+        layout.addLayout(metrics)
+
+        intro = QFrame()
+        intro.setObjectName("card")
+        intro_layout = QVBoxLayout(intro)
+        heading = QLabel("Un flujo completo antes de construir el solver")
+        heading.setStyleSheet("font-size: 18px; font-weight: 700;")
+        body = QLabel(
+            "Esta POC valida selección de sistema, composición, modelo, presentación de resultados, "
+            "comparación con phi = 1 y diagramas Pxy/Txy. Los resultados son deliberadamente simulados."
+        )
+        body.setWordWrap(True)
+        actions = QHBoxLayout()
+        calculate = QPushButton("Crear nuevo cálculo")
+        calculate.clicked.connect(lambda: self.navigate.emit(1))
+        diagram = QPushButton("Explorar diagramas")
+        diagram.setObjectName("secondaryButton")
+        diagram.clicked.connect(lambda: self.navigate.emit(3))
+        actions.addWidget(calculate)
+        actions.addWidget(diagram)
+        actions.addStretch()
+        intro_layout.addWidget(heading)
+        intro_layout.addWidget(body)
+        intro_layout.addLayout(actions)
+        layout.addWidget(intro)
+        layout.addStretch()
+
+
+class CalculationPage(QWidget):
+    calculated = Signal(object)
+
+    def __init__(self, repository: DataRepository, service: MockVLEService) -> None:
+        super().__init__()
+        self.repository = repository
+        self.service = service
+        layout = QVBoxLayout(self)
+        layout.addLayout(page_header("Nuevo cálculo", "Configure el flujo VLE que deberá resolver el núcleo termodinámico."))
+        layout.addWidget(warning_banner())
+
+        top = QHBoxLayout()
+        setup = QGroupBox("Configuración")
+        setup_form = QFormLayout(setup)
+        self.calculation_combo = QComboBox()
+        for item in CalculationType:
+            self.calculation_combo.addItem(item.value, item.name)
+        self.system_combo = QComboBox()
+        for system in repository.all_systems():
+            self.system_combo.addItem(system.name, system.id)
+        self.activity_combo = QComboBox()
+        for item in ActivityModel:
+            self.activity_combo.addItem(item.value, item.name)
+        self.vapor_combo = QComboBox()
+        for item in VaporModel:
+            self.vapor_combo.addItem(item.value, item.name)
+        self.fixed_value = QDoubleSpinBox()
+        self.fixed_value.setRange(0.001, 10000.0)
+        self.fixed_value.setDecimals(3)
+        self.fixed_value.setValue(350.0)
+        self.fixed_label = QLabel("Temperatura (K)")
+        setup_form.addRow("Tipo de cálculo", self.calculation_combo)
+        setup_form.addRow("Sistema", self.system_combo)
+        setup_form.addRow("Modelo de actividad", self.activity_combo)
+        setup_form.addRow("Fase vapor", self.vapor_combo)
+        setup_form.addRow(self.fixed_label, self.fixed_value)
+        top.addWidget(setup, 1)
+
+        numerical = QGroupBox("Control numérico")
+        numerical_form = QFormLayout(numerical)
+        self.tolerance = QDoubleSpinBox()
+        self.tolerance.setDecimals(7)
+        self.tolerance.setRange(0.0000001, 0.01)
+        self.tolerance.setValue(0.0001)
+        self.iterations = QSpinBox()
+        self.iterations.setRange(5, 10000)
+        self.iterations.setValue(100)
+        numerical_form.addRow("Tolerancia", self.tolerance)
+        numerical_form.addRow("Máximo de iteraciones", self.iterations)
+        note = QLabel("Estos controles se conectarán directamente a los solvers reales.")
+        note.setWordWrap(True)
+        numerical_form.addRow(note)
+        top.addWidget(numerical, 1)
+        layout.addLayout(top)
+
+        composition_group = QGroupBox("Composición conocida")
+        composition_layout = QVBoxLayout(composition_group)
+        self.phase_hint = QLabel()
+        self.composition_table = QTableWidget(0, 3)
+        self.composition_table.setHorizontalHeaderLabels(["Componente", "Fórmula", "Fracción molar"])
+        self.composition_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.composition_table.setAlternatingRowColors(True)
+        composition_layout.addWidget(self.phase_hint)
+        composition_layout.addWidget(self.composition_table)
+        layout.addWidget(composition_group)
+
+        action_row = QHBoxLayout()
+        self.total_label = QLabel()
+        action_row.addWidget(self.total_label)
+        action_row.addStretch()
+        reset = QPushButton("Restablecer composición")
+        reset.setObjectName("secondaryButton")
+        reset.clicked.connect(self._populate_composition)
+        run = QPushButton("Ejecutar simulación POC")
+        run.clicked.connect(self._run)
+        action_row.addWidget(reset)
+        action_row.addWidget(run)
+        layout.addLayout(action_row)
+
+        self.system_combo.currentIndexChanged.connect(self._populate_composition)
+        self.calculation_combo.currentIndexChanged.connect(self._update_fixed_variable)
+        self.composition_table.itemChanged.connect(self._update_total)
+        self._populate_composition()
+        self._update_fixed_variable()
+
+    def _populate_composition(self) -> None:
+        system = self.repository.get(self.system_combo.currentData())
+        self.composition_table.blockSignals(True)
+        self.composition_table.setRowCount(len(system.components))
+        equal = 1.0 / len(system.components)
+        for row, component in enumerate(system.components):
+            name = QTableWidgetItem(component.name)
+            name.setFlags(name.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            formula = QTableWidgetItem(component.formula)
+            formula.setFlags(formula.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            fraction = QTableWidgetItem(f"{equal:.6f}")
+            fraction.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.composition_table.setItem(row, 0, name)
+            self.composition_table.setItem(row, 1, formula)
+            self.composition_table.setItem(row, 2, fraction)
+        self.composition_table.blockSignals(False)
+        self._update_total()
+
+    def _update_fixed_variable(self) -> None:
+        calculation = CalculationType[self.calculation_combo.currentData()]
+        if calculation.fixed_variable == "temperatura":
+            self.fixed_label.setText("Temperatura (K)")
+            self.fixed_value.setValue(350.0)
+        else:
+            self.fixed_label.setText("Presión (kPa)")
+            self.fixed_value.setValue(101.325)
+        self.phase_hint.setText(f"Composición conocida de la fase {calculation.known_phase}: Σ zᵢ debe ser 1.")
+
+    def _composition(self) -> tuple[float, ...]:
+        values: list[float] = []
+        for row in range(self.composition_table.rowCount()):
+            item = self.composition_table.item(row, 2)
+            try:
+                values.append(float(item.text().replace(",", ".")))
+            except (AttributeError, ValueError) as exc:
+                raise InputValidationError(f"La fracción molar de la fila {row + 1} no es válida.") from exc
+        return tuple(values)
+
+    def _update_total(self) -> None:
+        try:
+            total = sum(self._composition())
+        except InputValidationError:
+            self.total_label.setText("Σ zᵢ = valor inválido")
+            self.total_label.setStyleSheet("color: #a23b3b; font-weight: 700;")
+            return
+        valid = abs(total - 1.0) <= 1e-3
+        self.total_label.setText(f"Σ zᵢ = {total:.6f}")
+        self.total_label.setStyleSheet(
+            f"color: {'#167467' if valid else '#a23b3b'}; font-weight: 700;"
+        )
+
+    def _run(self) -> None:
+        try:
+            request = CalculationRequest(
+                calculation_type=CalculationType[self.calculation_combo.currentData()],
+                system_id=self.system_combo.currentData(),
+                activity_model=ActivityModel[self.activity_combo.currentData()],
+                vapor_model=VaporModel[self.vapor_combo.currentData()],
+                fixed_value=self.fixed_value.value(),
+                composition=self._composition(),
+                tolerance=self.tolerance.value(),
+                max_iterations=self.iterations.value(),
+            )
+            self.calculated.emit(self.service.calculate(request))
+        except (InputValidationError, ValueError) as exc:
+            QMessageBox.warning(self, "Entrada no válida", str(exc))
+
+
+class ResultsPage(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.addLayout(page_header("Resultados", "Resumen uniforme preparado para los cuatro solvers VLE."))
+        layout.addWidget(warning_banner())
+        self.empty = QLabel("Ejecute un cálculo para visualizar los resultados.")
+        self.empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty.setStyleSheet("padding: 42px; color: #6d858a;")
+        layout.addWidget(self.empty)
+        self.content = QWidget()
+        content_layout = QVBoxLayout(self.content)
+        metrics = QHBoxLayout()
+        self.temperature_card = card("Temperatura", "—")
+        self.pressure_card = card("Presión", "—")
+        self.iteration_card = card("Iteraciones", "—")
+        self.status_card = card("Convergencia", "—")
+        for widget in (self.temperature_card, self.pressure_card, self.iteration_card, self.status_card):
+            metrics.addWidget(widget)
+        content_layout.addLayout(metrics)
+        self.summary = QLabel()
+        self.summary.setWordWrap(True)
+        content_layout.addWidget(self.summary)
+        self.table = QTableWidget(0, 7)
+        self.table.setHorizontalHeaderLabels(["Componente", "x", "y", "γ", "φ", "φ sat", "Poynting"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setAlternatingRowColors(True)
+        content_layout.addWidget(self.table)
+        self.residuals = QLabel()
+        self.residuals.setWordWrap(True)
+        content_layout.addWidget(self.residuals)
+        self.comparison = QLabel()
+        self.comparison.setObjectName("warningBanner")
+        self.comparison.setWordWrap(True)
+        content_layout.addWidget(self.comparison)
+        layout.addWidget(self.content)
+        self.content.hide()
+
+    def set_result(self, result: CalculationResult) -> None:
+        self.empty.hide()
+        self.content.show()
+        self.temperature_card.metric_label.setText(f"{result.temperature_k:.3f} K")  # type: ignore[attr-defined]
+        self.pressure_card.metric_label.setText(f"{result.pressure_kpa:.3f} kPa")  # type: ignore[attr-defined]
+        self.iteration_card.metric_label.setText(str(result.iterations))  # type: ignore[attr-defined]
+        self.status_card.metric_label.setText("Convergió" if result.converged else "No convergió")  # type: ignore[attr-defined]
+        self.summary.setText(
+            f"<b>{result.calculation_type}</b> · {result.system_name} · "
+            f"{result.activity_model} · {result.vapor_model}<br>{result.message}"
+        )
+        self.table.setRowCount(len(result.component_names))
+        vectors = (result.x, result.y, result.gamma, result.phi, result.phi_sat, result.poynting)
+        for row, name in enumerate(result.component_names):
+            self.table.setItem(row, 0, QTableWidgetItem(name))
+            for column, vector in enumerate(vectors, start=1):
+                item = QTableWidgetItem(f"{vector[row]:.6f}")
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.table.setItem(row, column, item)
+        residual_text = " · ".join(f"{key}: {value:.2e}" for key, value in result.residuals.items())
+        self.residuals.setText(f"<b>Residuales finales:</b> {residual_text}")
+        if result.comparison_value is not None:
+            target = result.pressure_kpa if "Presión" in (result.comparison_label or "") else result.temperature_k
+            delta = 100 * (target - result.comparison_value) / target
+            self.comparison.setText(
+                f"Comparación POC — {result.comparison_label}: {result.comparison_value:.3f}. "
+                f"Diferencia relativa simulada: {delta:.2f} %."
+            )
+            self.comparison.show()
+        else:
+            self.comparison.hide()
+
+
+class DiagramPage(QWidget):
+    def __init__(self, repository: DataRepository, service: MockVLEService) -> None:
+        super().__init__()
+        self.repository = repository
+        self.service = service
+        self.figure = Figure(figsize=(7, 4), tight_layout=True)
+        self.canvas = FigureCanvasQTAgg(self.figure)
+        layout = QVBoxLayout(self)
+        layout.addLayout(page_header("Diagrama de fases", "Curvas demostrativas Pxy y Txy para validar el diseño gráfico."))
+        layout.addWidget(warning_banner())
+        controls = QHBoxLayout()
+        self.system_combo = QComboBox()
+        for system in repository.all_systems():
+            if len(system.components) == 2:
+                self.system_combo.addItem(system.name, system.id)
+        self.type_combo = QComboBox()
+        self.type_combo.addItems(["Pxy", "Txy"])
+        self.fixed_value = QDoubleSpinBox()
+        self.fixed_value.setRange(1.0, 10000.0)
+        self.fixed_value.setValue(350.0)
+        generate = QPushButton("Generar")
+        generate.clicked.connect(self.generate)
+        save_png = QPushButton("Guardar PNG")
+        save_png.setObjectName("secondaryButton")
+        save_png.clicked.connect(lambda: self.save("png"))
+        save_pdf = QPushButton("Guardar PDF")
+        save_pdf.setObjectName("secondaryButton")
+        save_pdf.clicked.connect(lambda: self.save("pdf"))
+        for widget in (self.system_combo, self.type_combo, self.fixed_value, generate, save_png, save_pdf):
+            controls.addWidget(widget)
+        layout.addLayout(controls)
+        layout.addWidget(self.canvas, 1)
+        self.generate()
+
+    def generate(self) -> None:
+        data = self.service.phase_curve(
+            self.system_combo.currentData(), self.type_combo.currentText(), self.fixed_value.value()
+        )
+        self.figure.clear()
+        axes = self.figure.add_subplot(111)
+        axes.plot(data["x"], data["liquid"], color="#167467", linewidth=2.3, label="Líquido saturado")
+        axes.plot(data["y"], data["vapor"], color="#d58a35", linewidth=2.3, label="Vapor saturado")
+        axes.set_xlabel("Fracción molar del componente 1")
+        axes.set_ylabel(str(data["ylabel"][0]))
+        axes.set_title(str(data["title"][0]))
+        axes.grid(alpha=0.22)
+        axes.legend()
+        self.canvas.draw()
+
+    def save(self, extension: str) -> None:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = results_dir() / f"diagrama_{self.type_combo.currentText().lower()}_{timestamp}.{extension}"
+        self.figure.savefig(path, dpi=180)
+        QMessageBox.information(self, "Diagrama guardado", f"Archivo creado en:\n{path}")
+
+
+class ValidationsPage(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.addLayout(page_header("Validaciones", "Matriz prevista para evidencias científicas y numéricas."))
+        layout.addWidget(warning_banner())
+        table = QTableWidget(4, 5)
+        table.setHorizontalHeaderLabels(["Caso", "Propósito", "Estado POC", "Criterio final", "Evidencia"])
+        rows = [
+            ("Ciclohexano / n-Heptano", "Límite casi ideal", "Flujo disponible", "Recuperar Raoult", "Pendiente solver"),
+            ("Etanol / Tolueno", "Azeótropo", "Gráfico disponible", "Extremo Pxy/Txy", "Pendiente solver"),
+            ("Sistema ternario", "Multicomponente", "Tabla disponible", "≥ 3 especies", "Pendiente solver"),
+            ("Capítulo 14", "Referencia", "Diseño preparado", "Error < 2 %", "Pendiente solver"),
+        ]
+        for row, values in enumerate(rows):
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                if column == 2:
+                    item.setForeground(QBrush(QColor("#167467")))
+                table.setItem(row, column, item)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        layout.addWidget(table)
+
+
+class DatabasePage(QWidget):
+    def __init__(self, repository: DataRepository) -> None:
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.addLayout(page_header("Base de datos", "Catálogo demostrativo; propiedades reales se incorporarán con fuente y rango."))
+        layout.addWidget(warning_banner())
+        components = [(system, component) for system in repository.all_systems() for component in system.components]
+        table = QTableWidget(len(components), 7)
+        table.setHorizontalHeaderLabels(["Sistema", "Componente", "Fórmula", "Tc (K)", "Pc (kPa)", "ω", "Uso"])
+        for row, (system, component) in enumerate(components):
+            values = (
+                system.name,
+                component.name,
+                component.formula,
+                f"{component.tc_k:.2f}",
+                f"{component.pc_kpa:.2f}",
+                f"{component.omega:.3f}",
+                system.kind,
+            )
+            for column, value in enumerate(values):
+                table.setItem(row, column, QTableWidgetItem(value))
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setAlternatingRowColors(True)
+        layout.addWidget(table)
+
+
+class AboutPage(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.addLayout(page_header("Acerca del proyecto", "Alcance, arquitectura y límites de esta prueba de concepto."))
+        layout.addWidget(warning_banner())
+        panel = QFrame()
+        panel.setObjectName("card")
+        panel_layout = QVBoxLayout(panel)
+        text = QLabel(
+            "<h2>VLE Gamma-Phi · POC 0.1</h2>"
+            "<p>Interfaz desarrollada con PySide6 y Matplotlib. El núcleo actual es un servicio "
+            "simulado que respeta el contrato del futuro motor termodinámico.</p>"
+            "<p><b>Siguiente etapa:</b> Antoine, Pitzer, Wilson, Margules, Van Laar, BUBL P, "
+            "DEW P, BUBL T y DEW T con validaciones bibliográficas.</p>"
+            "<p><b>Uso de IA:</b> esta estructura fue desarrollada con asistencia de OpenAI Codex. "
+            "Las ecuaciones reales deberán revisarse contra las fuentes del proyecto.</p>"
+        )
+        text.setWordWrap(True)
+        panel_layout.addWidget(text)
+        layout.addWidget(panel)
+        layout.addStretch()
+
+
+class MainWindow(QMainWindow):
+    NAVIGATION = ("Inicio", "Nuevo cálculo", "Resultados", "Diagrama", "Validaciones", "Base de datos", "Acerca de")
+
+    def __init__(self, repository: DataRepository | None = None) -> None:
+        super().__init__()
+        self.repository = repository or DataRepository()
+        self.service = MockVLEService(self.repository)
+        self.setWindowTitle("VLE Gamma-Phi — POC")
+        self.setMinimumSize(1120, 720)
+        self.resize(1320, 820)
+        self.setStyleSheet(APP_STYLE)
+
+        root = QWidget()
+        root_layout = QHBoxLayout(root)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+        self.setCentralWidget(root)
+
+        sidebar = QFrame()
+        sidebar.setObjectName("sidebar")
+        sidebar.setFixedWidth(220)
+        sidebar_layout = QVBoxLayout(sidebar)
+        brand = QLabel("VLE · γ/φ")
+        brand.setObjectName("brand")
+        subtitle = QLabel("Termodinámica química\nPrueba de concepto")
+        subtitle.setObjectName("subtitle")
+        sidebar_layout.addWidget(brand)
+        sidebar_layout.addWidget(subtitle)
+        self.nav_group = QButtonGroup(self)
+        self.nav_group.setExclusive(True)
+        for index, name in enumerate(self.NAVIGATION):
+            button = QPushButton(name)
+            button.setObjectName("navButton")
+            button.setCheckable(True)
+            button.clicked.connect(lambda checked=False, i=index: self.navigate(i))
+            self.nav_group.addButton(button, index)
+            sidebar_layout.addWidget(button)
+        sidebar_layout.addStretch()
+        version = QLabel("POC 0.1 · SIMULACIÓN")
+        version.setStyleSheet("color: #9bc0c7; padding: 14px;")
+        sidebar_layout.addWidget(version)
+        root_layout.addWidget(sidebar)
+
+        content_frame = QFrame()
+        content_layout = QVBoxLayout(content_frame)
+        content_layout.setContentsMargins(26, 22, 26, 18)
+        self.stack = QStackedWidget()
+        self.home_page = HomePage(self.repository)
+        self.calculation_page = CalculationPage(self.repository, self.service)
+        self.results_page = ResultsPage()
+        self.diagram_page = DiagramPage(self.repository, self.service)
+        pages = (
+            self.home_page,
+            self.calculation_page,
+            self.results_page,
+            self.diagram_page,
+            ValidationsPage(),
+            DatabasePage(self.repository),
+            AboutPage(),
+        )
+        for page in pages:
+            self.stack.addWidget(page)
+        content_layout.addWidget(self.stack)
+        root_layout.addWidget(content_frame, 1)
+
+        self.home_page.navigate.connect(self.navigate)
+        self.calculation_page.calculated.connect(self._show_result)
+        self.nav_group.button(0).setChecked(True)
+        self.statusBar().showMessage("POC activa · Ningún resultado representa un cálculo termodinámico real")
+
+    def navigate(self, index: int) -> None:
+        self.stack.setCurrentIndex(index)
+        button = self.nav_group.button(index)
+        if button:
+            button.setChecked(True)
+
+    def _show_result(self, result: CalculationResult) -> None:
+        self.results_page.set_result(result)
+        self.navigate(2)
+        self.statusBar().showMessage(
+            f"{result.calculation_type} simulado · {result.system_name} · {result.iterations} iteraciones"
+        )
+
+
+def create_application() -> QApplication:
+    app = QApplication.instance() or QApplication([])
+    app.setApplicationName("VLE Gamma-Phi")
+    app.setOrganizationName("Proyecto Termodinámica IQ")
+    return app
