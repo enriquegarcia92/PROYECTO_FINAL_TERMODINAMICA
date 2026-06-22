@@ -34,6 +34,14 @@ python3 -m venv .venv
 
 ## Ejecución
 
+Windows, método recomendado para usuarios:
+
+```text
+Hacer doble clic en INICIAR_VLE_WINDOWS.bat
+```
+
+En la primera ejecución, el archivo crea `.venv` e instala automáticamente las dependencias. Las ejecuciones posteriores activan el entorno y abren `main.py` directamente.
+
 GUI:
 
 ```bash
