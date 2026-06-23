@@ -83,16 +83,30 @@ def format_result_txt(result: CalculationResult) -> str:
                 "Comparacion gamma-phi vs phi = 1",
                 "-" * 36,
                 f"{result.comparison_label}: {result.comparison_value:.6f}",
-                f"Diferencia relativa simulada: {delta:.6f} %",
+                f"Diferencia relativa: {delta:.6f} %",
             ]
         )
+
+    if result.psat_kpa:
+        lines.extend(["", "Presiones de saturacion", "-" * 20])
+        for name, value in zip(result.component_names, result.psat_kpa):
+            lines.append(f"{name}: {value:.6f} kPa")
+
+    if result.k_values:
+        lines.extend(["", "Valores K", "-" * 20])
+        for name, value in zip(result.component_names, result.k_values):
+            lines.append(f"{name}: {value:.6f}")
+
+    if result.data_sources:
+        lines.extend(["", "Fuentes de datos", "-" * 20])
+        lines.extend(f"- {source}" for source in result.data_sources)
 
     lines.extend(
         [
             "",
             "Nota",
             "-" * 20,
-            "Este archivo documenta una corrida de la POC. No contiene calculos termodinamicos reales.",
+            "Este archivo documenta una corrida del motor termodinamico. Revise fuentes, rangos y advertencias.",
             "",
         ]
     )

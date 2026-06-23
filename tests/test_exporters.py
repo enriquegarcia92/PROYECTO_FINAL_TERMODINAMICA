@@ -3,12 +3,12 @@ from __future__ import annotations
 from vle_poc.domain import ActivityModel, CalculationRequest, CalculationType, VaporModel
 from vle_poc.exporters import format_result_txt
 from vle_poc.repository import DataRepository
-from vle_poc.service import MockVLEService, SIMULATION_WARNING
+from vle_poc.service import SIMULATION_WARNING, ThermodynamicVLEService
 
 
 def test_result_txt_contains_required_sections() -> None:
     repository = DataRepository()
-    service = MockVLEService(repository)
+    service = ThermodynamicVLEService(repository)
     system = repository.all_systems()[0]
     result = service.calculate(
         CalculationRequest(
@@ -39,4 +39,7 @@ def test_result_txt_contains_required_sections() -> None:
     assert "Poynting" in text
     assert "Residuales finales" in text
     assert "Comparacion gamma-phi vs phi = 1" in text
-    assert "No contiene calculos termodinamicos reales" in text
+    assert "Presiones de saturacion" in text
+    assert "Valores K" in text
+    assert "Fuentes de datos" in text
+    assert "motor termodinamico" in text

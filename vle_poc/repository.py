@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .domain import Component, SystemDefinition
+from .domain import AntoineParameters, Component, SystemDefinition
 from .paths import resource_path
 
 
@@ -20,7 +20,14 @@ class DataRepository:
         raw = json.loads(self.path.read_text(encoding="utf-8"))
         systems: dict[str, SystemDefinition] = {}
         for item in raw.get("systems", []):
-            components = tuple(Component(**component) for component in item["components"])
+            parsed_components: list[Component] = []
+            for component in item["components"]:
+                payload = dict(component)
+                antoine = payload.get("antoine")
+                if antoine is not None:
+                    payload["antoine"] = AntoineParameters(**antoine)
+                parsed_components.append(Component(**payload))
+            components = tuple(parsed_components)
             system = SystemDefinition(
                 id=item["id"],
                 name=item["name"],
@@ -28,6 +35,7 @@ class DataRepository:
                 components=components,
                 available_models=tuple(item["available_models"]),
                 kind=item["kind"],
+                binary_parameters=item.get("binary_parameters", {}),
             )
             if system.id in systems:
                 raise ValueError(f"Sistema duplicado: {system.id}")

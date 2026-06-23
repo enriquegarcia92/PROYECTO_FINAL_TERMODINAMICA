@@ -1,8 +1,8 @@
-# VLE Gamma-Phi — POC para Windows
+# VLE Gamma-Phi — Motor termodinámico para Windows
 
 Aplicación de escritorio para validar el flujo, la arquitectura y la experiencia de usuario del proyecto VLE gamma-phi.
 
-> **Advertencia:** todos los resultados termodinámicos y diagramas de esta versión son simulados. No deben utilizarse para cálculos ni decisiones de ingeniería.
+> **Advertencia:** esta versión ya incluye cálculos termodinámicos reales para sistemas con datos completos documentados. Si faltan parámetros, el cálculo se bloquea en vez de inventar valores.
 
 ## Usuarios destino
 
@@ -11,7 +11,9 @@ Esta documentación está escrita para Windows. Aunque el código pueda ejecutar
 ## Qué incluye
 
 - Siete vistas: Inicio, Nuevo cálculo, Resultados, Diagrama, Validaciones, Base de datos y Acerca de.
-- Flujos BUBL P, DEW P, BUBL T y DEW T con un servicio determinista simulado.
+- Flujos BUBL P, DEW P, BUBL T y DEW T con motor termodinámico real.
+- Antoine con convención `ln(Psat[kPa]) = A - B/(T[°C] + C)`.
+- Corrección gamma-phi con Pitzer/virial, `phi_i`, `phi_i_sat` y Poynting.
 - Sistemas binarios y ternario demostrativos.
 - Selección de Wilson, Margules y Van Laar.
 - Comparación visual con `phi = 1`.
@@ -100,7 +102,7 @@ Para validar la POC desde PowerShell:
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-Las pruebas revisan validaciones, carga de datos, servicio simulado, estructura de resultados, exportación TXT y humo de interfaz.
+Las pruebas revisan validaciones, carga de datos, Antoine, modelos gamma, Pitzer, solvers VLE, estructura de resultados, exportación TXT y humo de interfaz.
 
 ## Generar el ejecutable `.exe` en Windows
 
@@ -135,13 +137,16 @@ dist\VLE_GammaPhi.exe
 - `vle_poc/domain.py`: contratos independientes de la interfaz.
 - `vle_poc/repository.py`: carga del JSON demostrativo.
 - `vle_poc/validation.py`: reglas reales de entrada.
-- `vle_poc/service.py`: servicio simulado reemplazable.
+- `vle_poc/properties.py`: Antoine y propiedades puras.
+- `vle_poc/activity.py`: Wilson, Margules y Van Laar.
+- `vle_poc/fugacity.py`: Pitzer/virial, fugacidad y Poynting.
+- `vle_poc/service.py`: motor real de BUBL P, DEW P, BUBL T y DEW T.
 - `vle_poc/exporters.py`: exportación TXT de resultados.
 - `vle_poc/ui.py`: aplicación PySide6.
 - `main.py` y `cli.py`: interfaces gráfica y de consola.
 
-El núcleo real deberá implementar el mismo método `calculate(request) -> CalculationResult`, permitiendo reemplazar la simulación sin reconstruir la GUI.
+El motor expone `calculate(request) -> CalculationResult`. Los sistemas o modelos sin parámetros documentados se rechazan con un mensaje claro.
 
 ## Próxima etapa
 
-Implementar Antoine, Pitzer, Wilson, Margules, Van Laar y los cuatro algoritmos iterativos; después sustituir `MockVLEService` por el servicio termodinámico validado contra el capítulo 14.
+Completar parámetros binarios documentados para más sistemas, robustecer validaciones bibliográficas y ampliar la batería contra ejemplos del capítulo 14.

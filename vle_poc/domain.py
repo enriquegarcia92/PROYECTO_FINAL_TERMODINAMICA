@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 
 class CalculationType(str, Enum):
@@ -33,6 +34,17 @@ class VaporModel(str, Enum):
 
 
 @dataclass(frozen=True)
+class AntoineParameters:
+    a: float
+    b: float
+    c: float
+    t_min_c: float
+    t_max_c: float
+    convention: str
+    source: str
+
+
+@dataclass(frozen=True)
 class Component:
     id: str
     name: str
@@ -40,6 +52,8 @@ class Component:
     tc_k: float
     pc_kpa: float
     omega: float
+    liquid_molar_volume_m3_mol: float | None = None
+    antoine: AntoineParameters | None = None
 
 
 @dataclass(frozen=True)
@@ -50,6 +64,7 @@ class SystemDefinition:
     components: tuple[Component, ...]
     available_models: tuple[str, ...]
     kind: str
+    binary_parameters: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -86,8 +101,11 @@ class CalculationResult:
     vapor_model: str
     comparison_value: float | None = None
     comparison_label: str | None = None
-    simulated: bool = True
+    simulated: bool = False
     history: tuple[dict[str, float], ...] = field(default_factory=tuple)
+    psat_kpa: tuple[float, ...] = field(default_factory=tuple)
+    k_values: tuple[float, ...] = field(default_factory=tuple)
+    data_sources: tuple[str, ...] = field(default_factory=tuple)
 
     def assert_shape(self) -> None:
         """Comprueba que todos los vectores coincidan con los componentes."""

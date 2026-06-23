@@ -2,7 +2,7 @@
 
 from vle_poc.domain import ActivityModel, CalculationRequest, CalculationType, VaporModel
 from vle_poc.repository import DataRepository
-from vle_poc.service import MockVLEService, SIMULATION_WARNING
+from vle_poc.service import SIMULATION_WARNING, ThermodynamicVLEService
 from vle_poc.units import celsius_to_kelvin, kelvin_to_celsius
 from vle_poc.validation import InputValidationError
 
@@ -19,8 +19,8 @@ def choose(title: str, options: list[tuple[str, object]]) -> object:
 
 def main() -> int:
     repository = DataRepository()
-    service = MockVLEService(repository)
-    print("VLE Gamma-Phi · CLI POC")
+    service = ThermodynamicVLEService(repository)
+    print("VLE Gamma-Phi · CLI termodinámica")
     print(SIMULATION_WARNING)
     try:
         calculation = choose("Tipo de cálculo", [(item.value, item) for item in CalculationType])

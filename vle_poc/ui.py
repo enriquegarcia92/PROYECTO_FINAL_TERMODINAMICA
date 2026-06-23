@@ -42,7 +42,7 @@ from PySide6.QtWidgets import (
 from .domain import ActivityModel, CalculationRequest, CalculationResult, CalculationType, VaporModel
 from .exporters import format_result_txt
 from .repository import DataRepository
-from .service import MockVLEService, SIMULATION_WARNING
+from .service import SIMULATION_WARNING, ThermodynamicVLEService
 from .styles import APP_STYLE
 from .units import celsius_to_kelvin, kelvin_to_celsius
 from .validation import InputValidationError
@@ -103,7 +103,7 @@ class HomePage(QWidget):
         heading.setStyleSheet("font-size: 18px; font-weight: 700;")
         body = QLabel(
             "Esta POC valida selección de sistema, composición, modelo, presentación de resultados, "
-            "comparación con phi = 1 y diagramas Pxy/Txy. Los resultados son deliberadamente simulados."
+            "comparación con phi = 1 y diagramas Pxy/Txy. Los cálculos corren solo con datos documentados."
         )
         body.setWordWrap(True)
         actions = QHBoxLayout()
@@ -125,7 +125,7 @@ class HomePage(QWidget):
 class CalculationPage(QWidget):
     calculated = Signal(object)
 
-    def __init__(self, repository: DataRepository, service: MockVLEService) -> None:
+    def __init__(self, repository: DataRepository, service: ThermodynamicVLEService) -> None:
         super().__init__()
         self.repository = repository
         self.service = service
@@ -195,7 +195,7 @@ class CalculationPage(QWidget):
         reset = QPushButton("Restablecer composición")
         reset.setObjectName("secondaryButton")
         reset.clicked.connect(self._populate_composition)
-        run = QPushButton("Ejecutar simulación POC")
+        run = QPushButton("Ejecutar cálculo")
         run.clicked.connect(self._run)
         action_row.addWidget(reset)
         action_row.addWidget(run)
@@ -359,8 +359,8 @@ class ResultsPage(QWidget):
             target = result.pressure_kpa if "Presión" in (result.comparison_label or "") else result.temperature_k
             delta = 100 * (target - result.comparison_value) / target
             self.comparison.setText(
-                f"Comparación POC — {result.comparison_label}: {result.comparison_value:.3f}. "
-                f"Diferencia relativa simulada: {delta:.2f} %."
+                f"Comparación — {result.comparison_label}: {result.comparison_value:.3f}. "
+                f"Diferencia relativa: {delta:.2f} %."
             )
             self.comparison.show()
         else:
@@ -401,7 +401,7 @@ class ResultsPage(QWidget):
 
 
 class DiagramPage(QWidget):
-    def __init__(self, repository: DataRepository, service: MockVLEService) -> None:
+    def __init__(self, repository: DataRepository, service: ThermodynamicVLEService) -> None:
         super().__init__()
         self.repository = repository
         self.service = service
@@ -448,9 +448,13 @@ class DiagramPage(QWidget):
             self.fixed_value.setValue(101.325)
 
     def generate(self) -> None:
-        data = self.service.phase_curve(
-            self.system_combo.currentData(), self.type_combo.currentText(), self.fixed_value.value()
-        )
+        try:
+            data = self.service.phase_curve(
+                self.system_combo.currentData(), self.type_combo.currentText(), self.fixed_value.value()
+            )
+        except (InputValidationError, ValueError) as exc:
+            QMessageBox.warning(self, "No se pudo generar el diagrama", str(exc))
+            return
         self.figure.clear()
         axes = self.figure.add_subplot(111)
         axes.plot(data["x"], data["liquid"], color="#167467", linewidth=2.3, label="Líquido saturado")
@@ -555,9 +559,9 @@ class AboutPage(QWidget):
         text = QLabel(
             "<h2>VLE Gamma-Phi · POC 0.1</h2>"
             "<p>Interfaz desarrollada con PySide6 y Matplotlib. El núcleo actual es un servicio "
-            "simulado que respeta el contrato del futuro motor termodinámico.</p>"
-            "<p><b>Siguiente etapa:</b> Antoine, Pitzer, Wilson, Margules, Van Laar, BUBL P, "
-            "DEW P, BUBL T y DEW T con validaciones bibliográficas.</p>"
+            "termodinámico real para sistemas con datos completos documentados.</p>"
+            "<p><b>Política de datos:</b> si faltan parámetros Antoine, Pitzer o binarios, "
+            "el cálculo se bloquea con un mensaje claro en vez de inventar valores.</p>"
             "<p><b>Uso de IA:</b> esta estructura fue desarrollada con asistencia de OpenAI Codex. "
             "Las ecuaciones reales deberán revisarse contra las fuentes del proyecto.</p>"
         )
@@ -573,7 +577,7 @@ class MainWindow(QMainWindow):
     def __init__(self, repository: DataRepository | None = None) -> None:
         super().__init__()
         self.repository = repository or DataRepository()
-        self.service = MockVLEService(self.repository)
+        self.service = ThermodynamicVLEService(self.repository)
         self.setWindowTitle("VLE Gamma-Phi — POC")
         self.setMinimumSize(1120, 720)
         self.resize(1320, 820)
@@ -605,7 +609,7 @@ class MainWindow(QMainWindow):
             self.nav_group.addButton(button, index)
             sidebar_layout.addWidget(button)
         sidebar_layout.addStretch()
-        version = QLabel("POC 0.1 · SIMULACIÓN")
+        version = QLabel("POC 0.2 · MOTOR REAL")
         version.setStyleSheet("color: #9bc0c7; padding: 14px;")
         sidebar_layout.addWidget(version)
         root_layout.addWidget(sidebar)
@@ -635,7 +639,7 @@ class MainWindow(QMainWindow):
         self.home_page.navigate.connect(self.navigate)
         self.calculation_page.calculated.connect(self._show_result)
         self.nav_group.button(0).setChecked(True)
-        self.statusBar().showMessage("POC activa · Ningún resultado representa un cálculo termodinámico real")
+        self.statusBar().showMessage("Motor real activo · Solo calcula sistemas con datos documentados")
 
     def navigate(self, index: int) -> None:
         self.stack.setCurrentIndex(index)
@@ -647,7 +651,7 @@ class MainWindow(QMainWindow):
         self.results_page.set_result(result)
         self.navigate(2)
         self.statusBar().showMessage(
-            f"{result.calculation_type} simulado · {result.system_name} · {result.iterations} iteraciones"
+            f"{result.calculation_type} · {result.system_name} · {result.iterations} iteraciones"
         )
 
 
