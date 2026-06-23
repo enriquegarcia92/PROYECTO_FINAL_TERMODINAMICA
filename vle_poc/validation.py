@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 from .domain import CalculationRequest, CalculationType, SystemDefinition
+from .units import kelvin_to_celsius
 
 
 class InputValidationError(ValueError):
@@ -31,14 +32,22 @@ def validate_composition(values: tuple[float, ...], expected_size: int) -> tuple
 
 def validate_request(request: CalculationRequest, system: SystemDefinition) -> CalculationRequest:
     composition = validate_composition(request.composition, len(system.components))
-    if request.fixed_value <= 0 or not math.isfinite(request.fixed_value):
-        variable = request.calculation_type.fixed_variable.capitalize()
-        raise InputValidationError(f"{variable} debe ser un número positivo y finito.")
     if request.calculation_type in {CalculationType.BUBL_P, CalculationType.DEW_P}:
+        if not math.isfinite(request.fixed_value):
+            raise InputValidationError("La temperatura debe ser un número finito.")
         if request.fixed_value < 180 or request.fixed_value > 800:
-            raise InputValidationError("La temperatura debe estar entre 180 K y 800 K para esta POC.")
-    elif request.fixed_value > 10_000:
-        raise InputValidationError("La presión excede el límite de 10 000 kPa de esta POC.")
+            lower_c = kelvin_to_celsius(180)
+            upper_c = kelvin_to_celsius(800)
+            raise InputValidationError(
+                "La temperatura ingresada debe estar entre "
+                f"{lower_c:.2f} °C y {upper_c:.2f} °C "
+                "(equivalente a 180 K y 800 K para esta POC)."
+            )
+    else:
+        if request.fixed_value <= 0 or not math.isfinite(request.fixed_value):
+            raise InputValidationError("Presión debe ser un número positivo y finito.")
+        if request.fixed_value > 10_000:
+            raise InputValidationError("La presión excede el límite de 10 000 kPa de esta POC.")
     if request.activity_model.value not in system.available_models:
         raise InputValidationError(
             f"No hay parámetros {request.activity_model.value} para {system.name}."

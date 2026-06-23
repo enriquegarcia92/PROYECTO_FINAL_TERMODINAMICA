@@ -21,6 +21,10 @@ Esta documentación está escrita para Windows. Aunque el código pueda ejecutar
 - CLI que consume el mismo contrato de dominio.
 - Pruebas automatizadas y configuración PyInstaller para generar `.exe` en Windows.
 
+## Regla de unidades de temperatura
+
+El usuario ingresa temperaturas en grados Celsius (`°C`). Internamente, la aplicación convierte esas temperaturas a Kelvin (`K`) antes de enviarlas al servicio de cálculo, porque las fórmulas termodinámicas requieren temperatura absoluta. Los resultados y reportes pueden mostrar ambas unidades para trazabilidad.
+
 ## Opción recomendada para usuarios: ejecutar con doble clic
 
 1. Extraiga el proyecto completo en una carpeta conocida, por ejemplo:

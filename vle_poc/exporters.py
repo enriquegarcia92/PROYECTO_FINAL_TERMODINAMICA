@@ -6,6 +6,7 @@ from datetime import datetime
 
 from .domain import CalculationResult
 from .service import SIMULATION_WARNING
+from .units import kelvin_to_celsius
 
 
 def format_result_txt(result: CalculationResult) -> str:
@@ -31,6 +32,7 @@ def format_result_txt(result: CalculationResult) -> str:
         f"Modelo de actividad: {result.activity_model}",
         f"Modelo de vapor: {result.vapor_model}",
         f"Temperatura: {result.temperature_k:.6f} K",
+        f"Temperatura: {kelvin_to_celsius(result.temperature_k):.6f} °C",
         f"Presion: {result.pressure_kpa:.6f} kPa",
         f"Convergencia: {'Convergio' if result.converged else 'No convergio'}",
         f"Iteraciones: {result.iterations}",

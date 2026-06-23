@@ -107,7 +107,7 @@ class MockVLEService:
             liquid = 55.0 + 55.0 * x + 7.0 * np.sin(np.pi * x)
             vapor = 55.0 + 55.0 * y - 5.0 * np.sin(np.pi * y)
             ylabel = "Presión (kPa)"
-            condition = f"T = {fixed_value:.2f} K"
+            condition = f"T = {fixed_value:.2f} °C"
         else:
             liquid = 365.0 - 28.0 * x - 5.0 * np.sin(np.pi * x)
             vapor = 365.0 - 28.0 * y + 4.0 * np.sin(np.pi * y)

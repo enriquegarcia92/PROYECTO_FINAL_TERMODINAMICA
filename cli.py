@@ -3,6 +3,7 @@
 from vle_poc.domain import ActivityModel, CalculationRequest, CalculationType, VaporModel
 from vle_poc.repository import DataRepository
 from vle_poc.service import MockVLEService, SIMULATION_WARNING
+from vle_poc.units import celsius_to_kelvin, kelvin_to_celsius
 from vle_poc.validation import InputValidationError
 
 
@@ -27,8 +28,10 @@ def main() -> int:
         activity = choose("Modelo de actividad", [(item.value, item) for item in ActivityModel])
         vapor = choose("Modelo de vapor", [(item.value, item) for item in VaporModel])
         variable = calculation.fixed_variable
-        unit = "K" if variable == "temperatura" else "kPa"
+        unit = "°C" if variable == "temperatura" else "kPa"
         fixed_value = float(input(f"Ingrese {variable} ({unit}): "))
+        if variable == "temperatura":
+            fixed_value = celsius_to_kelvin(fixed_value)
         raw = input(f"Ingrese {len(system.components)} fracciones molares separadas por coma: ")
         composition = tuple(float(value.strip()) for value in raw.split(","))
         result = service.calculate(
@@ -38,7 +41,10 @@ def main() -> int:
         print(f"Error: {exc}")
         return 1
     print(f"\nEstado: {'convergió' if result.converged else 'no convergió'}")
-    print(f"T = {result.temperature_k:.3f} K | P = {result.pressure_kpa:.3f} kPa")
+    print(
+        f"T = {result.temperature_k:.3f} K ({kelvin_to_celsius(result.temperature_k):.3f} °C) "
+        f"| P = {result.pressure_kpa:.3f} kPa"
+    )
     for name, x_value, y_value in zip(result.component_names, result.x, result.y):
         print(f"  {name}: x={x_value:.6f}, y={y_value:.6f}")
     print(SIMULATION_WARNING)

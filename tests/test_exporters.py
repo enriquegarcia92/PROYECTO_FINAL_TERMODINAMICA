@@ -30,6 +30,8 @@ def test_result_txt_contains_required_sections() -> None:
     assert "Modelo de actividad: Wilson" in text
     assert "Modelo de vapor: Comparar con phi = 1" in text
     assert "Temperatura:" in text
+    assert "350.000000 K" in text
+    assert "76.850000 °C" in text
     assert "Presion:" in text
     assert "Tabla por componente" in text
     assert "gamma" in text

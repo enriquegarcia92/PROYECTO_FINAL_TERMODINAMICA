@@ -44,6 +44,7 @@ from .exporters import format_result_txt
 from .repository import DataRepository
 from .service import MockVLEService, SIMULATION_WARNING
 from .styles import APP_STYLE
+from .units import celsius_to_kelvin, kelvin_to_celsius
 from .validation import InputValidationError
 
 
@@ -148,10 +149,10 @@ class CalculationPage(QWidget):
         for item in VaporModel:
             self.vapor_combo.addItem(item.value, item.name)
         self.fixed_value = QDoubleSpinBox()
-        self.fixed_value.setRange(0.001, 10000.0)
+        self.fixed_value.setRange(-273.149, 10000.0)
         self.fixed_value.setDecimals(3)
-        self.fixed_value.setValue(350.0)
-        self.fixed_label = QLabel("Temperatura (K)")
+        self.fixed_value.setValue(76.850)
+        self.fixed_label = QLabel("Temperatura (°C)")
         setup_form.addRow("Tipo de cálculo", self.calculation_combo)
         setup_form.addRow("Sistema", self.system_combo)
         setup_form.addRow("Modelo de actividad", self.activity_combo)
@@ -227,10 +228,14 @@ class CalculationPage(QWidget):
     def _update_fixed_variable(self) -> None:
         calculation = CalculationType[self.calculation_combo.currentData()]
         if calculation.fixed_variable == "temperatura":
-            self.fixed_label.setText("Temperatura (K)")
-            self.fixed_value.setValue(350.0)
+            self.fixed_label.setText("Temperatura (°C)")
+            self.fixed_value.setRange(-273.149, 10000.0)
+            self.fixed_value.setSuffix(" °C")
+            self.fixed_value.setValue(76.850)
         else:
             self.fixed_label.setText("Presión (kPa)")
+            self.fixed_value.setRange(0.001, 10000.0)
+            self.fixed_value.setSuffix(" kPa")
             self.fixed_value.setValue(101.325)
         self.phase_hint.setText(f"Composición conocida de la fase {calculation.known_phase}: Σ zᵢ debe ser 1.")
 
@@ -259,12 +264,17 @@ class CalculationPage(QWidget):
 
     def _run(self) -> None:
         try:
+            calculation_type = CalculationType[self.calculation_combo.currentData()]
             request = CalculationRequest(
-                calculation_type=CalculationType[self.calculation_combo.currentData()],
+                calculation_type=calculation_type,
                 system_id=self.system_combo.currentData(),
                 activity_model=ActivityModel[self.activity_combo.currentData()],
                 vapor_model=VaporModel[self.vapor_combo.currentData()],
-                fixed_value=self.fixed_value.value(),
+                fixed_value=(
+                    celsius_to_kelvin(self.fixed_value.value())
+                    if calculation_type.fixed_variable == "temperatura"
+                    else self.fixed_value.value()
+                ),
                 composition=self._composition(),
                 tolerance=self.tolerance.value(),
                 max_iterations=self.iterations.value(),
@@ -325,7 +335,9 @@ class ResultsPage(QWidget):
         self.current_result = result
         self.empty.hide()
         self.content.show()
-        self.temperature_card.metric_label.setText(f"{result.temperature_k:.3f} K")  # type: ignore[attr-defined]
+        self.temperature_card.metric_label.setText(
+            f"{result.temperature_k:.3f} K ({kelvin_to_celsius(result.temperature_k):.3f} °C)"
+        )  # type: ignore[attr-defined]
         self.pressure_card.metric_label.setText(f"{result.pressure_kpa:.3f} kPa")  # type: ignore[attr-defined]
         self.iteration_card.metric_label.setText(str(result.iterations))  # type: ignore[attr-defined]
         self.status_card.metric_label.setText("Convergió" if result.converged else "No convergió")  # type: ignore[attr-defined]
@@ -406,8 +418,9 @@ class DiagramPage(QWidget):
         self.type_combo = QComboBox()
         self.type_combo.addItems(["Pxy", "Txy"])
         self.fixed_value = QDoubleSpinBox()
-        self.fixed_value.setRange(1.0, 10000.0)
-        self.fixed_value.setValue(350.0)
+        self.fixed_value.setRange(-273.149, 10000.0)
+        self.fixed_value.setDecimals(3)
+        self.fixed_value.setValue(76.850)
         generate = QPushButton("Generar")
         generate.clicked.connect(self.generate)
         save_png = QPushButton("Guardar PNG")
@@ -420,7 +433,19 @@ class DiagramPage(QWidget):
             controls.addWidget(widget)
         layout.addLayout(controls)
         layout.addWidget(self.canvas, 1)
+        self.type_combo.currentIndexChanged.connect(self._update_fixed_control)
+        self._update_fixed_control()
         self.generate()
+
+    def _update_fixed_control(self) -> None:
+        if self.type_combo.currentText() == "Pxy":
+            self.fixed_value.setRange(-273.149, 10000.0)
+            self.fixed_value.setSuffix(" °C")
+            self.fixed_value.setValue(76.850)
+        else:
+            self.fixed_value.setRange(0.001, 10000.0)
+            self.fixed_value.setSuffix(" kPa")
+            self.fixed_value.setValue(101.325)
 
     def generate(self) -> None:
         data = self.service.phase_curve(
