@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QComboBox,
     QDoubleSpinBox,
+    QFileDialog,
     QFormLayout,
     QFrame,
     QGridLayout,
@@ -39,7 +40,7 @@ from PySide6.QtWidgets import (
 )
 
 from .domain import ActivityModel, CalculationRequest, CalculationResult, CalculationType, VaporModel
-from .paths import results_dir
+from .exporters import format_result_txt
 from .repository import DataRepository
 from .service import MockVLEService, SIMULATION_WARNING
 from .styles import APP_STYLE
@@ -276,6 +277,7 @@ class CalculationPage(QWidget):
 class ResultsPage(QWidget):
     def __init__(self) -> None:
         super().__init__()
+        self.current_result: CalculationResult | None = None
         layout = QVBoxLayout(self)
         layout.addLayout(page_header("Resultados", "Resumen uniforme preparado para los cuatro solvers VLE."))
         layout.addWidget(warning_banner())
@@ -309,10 +311,18 @@ class ResultsPage(QWidget):
         self.comparison.setObjectName("warningBanner")
         self.comparison.setWordWrap(True)
         content_layout.addWidget(self.comparison)
+        actions = QHBoxLayout()
+        actions.addStretch()
+        self.save_txt_button = QPushButton("Guardar resultados TXT")
+        self.save_txt_button.setObjectName("secondaryButton")
+        self.save_txt_button.clicked.connect(self.save_txt)
+        actions.addWidget(self.save_txt_button)
+        content_layout.addLayout(actions)
         layout.addWidget(self.content)
         self.content.hide()
 
     def set_result(self, result: CalculationResult) -> None:
+        self.current_result = result
         self.empty.hide()
         self.content.show()
         self.temperature_card.metric_label.setText(f"{result.temperature_k:.3f} K")  # type: ignore[attr-defined]
@@ -343,6 +353,39 @@ class ResultsPage(QWidget):
             self.comparison.show()
         else:
             self.comparison.hide()
+
+    def save_txt(self) -> None:
+        if self.current_result is None:
+            QMessageBox.information(
+                self,
+                "Sin resultados",
+                "Primero ejecute un cálculo para poder guardar el reporte TXT.",
+            )
+            return
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        suggested = str(Path.home() / "Documents" / f"resultados_vle_{timestamp}.txt")
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Guardar resultados TXT",
+            suggested,
+            "Archivo de texto (*.txt)",
+        )
+        if not path:
+            QMessageBox.information(self, "Guardado cancelado", "No se creó ningún archivo.")
+            return
+        target = Path(path)
+        if target.suffix.lower() != ".txt":
+            target = target.with_suffix(".txt")
+        try:
+            target.write_text(format_result_txt(self.current_result), encoding="utf-8")
+        except OSError as exc:
+            QMessageBox.critical(
+                self,
+                "No se pudo guardar",
+                f"No fue posible crear el archivo seleccionado.\n\nDetalle: {exc}",
+            )
+            return
+        QMessageBox.information(self, "Resultados guardados", f"Archivo creado en:\n{target}")
 
 
 class DiagramPage(QWidget):
@@ -396,9 +439,31 @@ class DiagramPage(QWidget):
 
     def save(self, extension: str) -> None:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        path = results_dir() / f"diagrama_{self.type_combo.currentText().lower()}_{timestamp}.{extension}"
-        self.figure.savefig(path, dpi=180)
-        QMessageBox.information(self, "Diagrama guardado", f"Archivo creado en:\n{path}")
+        diagram_type = self.type_combo.currentText().lower()
+        suggested = str(Path.home() / "Documents" / f"diagrama_{diagram_type}_{timestamp}.{extension}")
+        if extension == "png":
+            title = "Guardar diagrama PNG"
+            file_filter = "Imagen PNG (*.png)"
+        else:
+            title = "Guardar diagrama PDF"
+            file_filter = "Documento PDF (*.pdf)"
+        path, _ = QFileDialog.getSaveFileName(self, title, suggested, file_filter)
+        if not path:
+            QMessageBox.information(self, "Guardado cancelado", "No se creó ningún archivo.")
+            return
+        target = Path(path)
+        if target.suffix.lower() != f".{extension}":
+            target = target.with_suffix(f".{extension}")
+        try:
+            self.figure.savefig(target, dpi=180)
+        except OSError as exc:
+            QMessageBox.critical(
+                self,
+                "No se pudo guardar",
+                f"No fue posible crear el archivo seleccionado.\n\nDetalle: {exc}",
+            )
+            return
+        QMessageBox.information(self, "Diagrama guardado", f"Archivo creado en:\n{target}")
 
 
 class ValidationsPage(QWidget):

@@ -1,8 +1,12 @@
-# VLE Gamma-Phi — POC PySide6
+# VLE Gamma-Phi — POC para Windows
 
 Aplicación de escritorio para validar el flujo, la arquitectura y la experiencia de usuario del proyecto VLE gamma-phi.
 
 > **Advertencia:** todos los resultados termodinámicos y diagramas de esta versión son simulados. No deben utilizarse para cálculos ni decisiones de ingeniería.
+
+## Usuarios destino
+
+Esta documentación está escrita para Windows. Aunque el código pueda ejecutarse en otros sistemas durante desarrollo, las instrucciones de uso, instalación y distribución del proyecto final se enfocan exclusivamente en computadoras Windows.
 
 ## Qué incluye
 
@@ -11,73 +15,115 @@ Aplicación de escritorio para validar el flujo, la arquitectura y la experienci
 - Sistemas binarios y ternario demostrativos.
 - Selección de Wilson, Margules y Van Laar.
 - Comparación visual con `phi = 1`.
-- Diagramas Pxy/Txy exportables a PNG/PDF.
+- Diagramas Pxy/Txy exportables a PNG/PDF mediante ventana “Guardar como”.
+- Resultados exportables a TXT mediante ventana “Guardar como”.
 - Validaciones reales de composiciones, presión, temperatura y disponibilidad de parámetros.
 - CLI que consume el mismo contrato de dominio.
-- Pruebas automatizadas y configuración PyInstaller.
+- Pruebas automatizadas y configuración PyInstaller para generar `.exe` en Windows.
 
-## Requisitos
+## Opción recomendada para usuarios: ejecutar con doble clic
 
-- Python 3.12–3.14.
-- macOS para ejecutar esta POC local o Windows para generar el `.exe`.
+1. Extraiga el proyecto completo en una carpeta conocida, por ejemplo:
 
-## Instalación en macOS/Linux
+   ```text
+   C:\Users\SuUsuario\Documents\PROYECTO_FINAL_TERMODINAMICA
+   ```
 
-```bash
-cd PROYECTO_FINAL_TERMODINAMICA
-python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -r requirements.txt
+2. Abra la carpeta del proyecto.
+
+3. Haga doble clic en:
+
+   ```text
+   INICIAR_VLE_WINDOWS.bat
+   ```
+
+4. En la primera ejecución, el archivo prepara automáticamente el entorno `.venv` e instala las dependencias desde `requirements.txt`.
+
+5. Cuando termine la preparación, se abrirá la aplicación.
+
+No cierre la ventana negra mientras la aplicación esté abierta. Si ocurre un error, tome una captura de esa ventana y envíela al equipo de soporte.
+
+## Requisitos para ejecutar desde código fuente en Windows
+
+- Windows 10 u 11.
+- Python 3.12, 3.13 o 3.14 instalado.
+- Conexión a Internet durante la primera instalación de dependencias.
+- Permiso para ejecutar archivos `.bat`.
+
+Si Windows no reconoce Python, instálelo desde Microsoft Store o desde [python.org](https://www.python.org/downloads/windows/). Después cierre y vuelva a abrir la carpeta del proyecto antes de intentar nuevamente.
+
+## Ejecución manual en Windows
+
+Use esta ruta solo si el doble clic en `INICIAR_VLE_WINDOWS.bat` no es suficiente o si necesita depurar.
+
+Abra PowerShell dentro de la carpeta del proyecto y ejecute:
+
+```powershell
+py -3.14 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe main.py
 ```
 
-`requirements-lock.txt` conserva las versiones exactas verificadas con Python 3.14.5 en esta POC.
+Si no tiene Python 3.14, use:
 
-## Ejecución
-
-Windows, método recomendado para usuarios:
-
-```text
-Hacer doble clic en INICIAR_VLE_WINDOWS.bat
+```powershell
+py -3 -m venv .venv
 ```
 
-En la primera ejecución, el archivo crea `.venv` e instala automáticamente las dependencias. Las ejecuciones posteriores activan el entorno y abren `main.py` directamente.
+## CLI de consola
 
-GUI:
+La aplicación también conserva una interfaz mínima de consola, requerida por el proyecto:
 
-```bash
-.venv/bin/python main.py
+```powershell
+.\.venv\Scripts\python.exe cli.py
 ```
 
-CLI:
+## Exportación de diagramas y resultados
 
-```bash
-.venv/bin/python cli.py
+Desde la interfaz:
+
+- En la vista **Diagrama**, use `Guardar PNG` o `Guardar PDF`.
+- En la vista **Resultados**, después de ejecutar un cálculo, use `Guardar resultados TXT`.
+
+En todos los casos se abre una ventana de Windows para elegir carpeta y nombre de archivo. La aplicación no obliga al usuario a guardar en una carpeta fija.
+
+## Pruebas en Windows
+
+Para validar la POC desde PowerShell:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
 ```
 
-Pruebas:
+Las pruebas revisan validaciones, carga de datos, servicio simulado, estructura de resultados, exportación TXT y humo de interfaz.
 
-```bash
-QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest
-```
+## Generar el ejecutable `.exe` en Windows
 
-## Diagramas y resultados
+PyInstaller debe ejecutarse en Windows para generar un `.exe` de Windows.
 
-Durante el desarrollo se guardan en `resultados/`. En el ejecutable se guardarán en `Documentos/VLE Gamma-Phi/resultados/`, porque los recursos internos de PyInstaller no son escribibles de forma permanente.
-
-## Build Windows
-
-PyInstaller no genera un `.exe` de Windows desde macOS. En una computadora Windows, abra PowerShell dentro del proyecto y ejecute:
+Primero genere la versión diagnosticable `onedir`:
 
 ```powershell
 .\scripts\build_windows.ps1
 ```
 
-El primer entregable de empaquetado será `dist\VLE_GammaPhi\VLE_GammaPhi.exe` en modo `onedir`, más fácil de diagnosticar. Después de validarlo se preparará la variante `onefile --windowed`.
+El resultado esperado es:
 
-Tras validar `onedir`, el ejecutable único se genera con:
+```text
+dist\VLE_GammaPhi\VLE_GammaPhi.exe
+```
+
+Después de validar esa carpeta, genere la versión final de archivo único:
 
 ```powershell
 .\scripts\build_windows_onefile.ps1
+```
+
+El resultado esperado es:
+
+```text
+dist\VLE_GammaPhi.exe
 ```
 
 ## Arquitectura
@@ -86,6 +132,7 @@ Tras validar `onedir`, el ejecutable único se genera con:
 - `vle_poc/repository.py`: carga del JSON demostrativo.
 - `vle_poc/validation.py`: reglas reales de entrada.
 - `vle_poc/service.py`: servicio simulado reemplazable.
+- `vle_poc/exporters.py`: exportación TXT de resultados.
 - `vle_poc/ui.py`: aplicación PySide6.
 - `main.py` y `cli.py`: interfaces gráfica y de consola.
 
