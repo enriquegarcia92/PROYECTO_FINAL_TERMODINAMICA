@@ -47,3 +47,31 @@ def test_multicomponent_result_has_three_rows() -> None:
                 (0.2, 0.3, 0.5),
             )
         )
+
+
+def test_dynamic_components_reproduce_template_bubl_t() -> None:
+    repository = DataRepository()
+    service = ThermodynamicVLEService(repository)
+    template_result = service.calculate(
+        CalculationRequest(
+            CalculationType.BUBL_T,
+            "cyclohexane_n_heptane",
+            ActivityModel.WILSON,
+            VaporModel.GAMMA_PHI,
+            101.325,
+            (0.5, 0.5),
+        )
+    )
+    dynamic_result = service.calculate(
+        CalculationRequest(
+            CalculationType.BUBL_T,
+            "dynamic",
+            ActivityModel.WILSON,
+            VaporModel.GAMMA_PHI,
+            101.325,
+            (0.5, 0.5),
+            component_ids=("cyclohexane", "n_heptane"),
+        )
+    )
+    assert dynamic_result.temperature_k == pytest.approx(template_result.temperature_k)
+    assert dynamic_result.y == pytest.approx(template_result.y)

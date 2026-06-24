@@ -33,6 +33,10 @@ class VaporModel(str, Enum):
     COMPARE = "Comparar con phi = 1"
 
 
+MIN_COMPONENTS = 2
+MAX_COMPONENTS = 5
+
+
 @dataclass(frozen=True)
 class AntoineParameters:
     a: float
@@ -77,6 +81,7 @@ class CalculationRequest:
     composition: tuple[float, ...]
     tolerance: float = 1e-4
     max_iterations: int = 100
+    component_ids: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)

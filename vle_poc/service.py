@@ -6,7 +6,7 @@ import numpy as np
 from scipy.optimize import brentq
 
 from .activity import activity_coefficients
-from .domain import ActivityModel, CalculationRequest, CalculationResult, CalculationType, VaporModel
+from .domain import ActivityModel, CalculationRequest, CalculationResult, CalculationType, SystemDefinition, VaporModel
 from .fugacity import phi_mixture, phi_sat_pitzer, poynting_factor
 from .properties import psat_kpa, tsat_k_at_pressure
 from .repository import DataRepository
@@ -20,6 +20,11 @@ class ThermodynamicVLEService:
     def __init__(self, repository: DataRepository) -> None:
         self.repository = repository
 
+    def _system(self, request: CalculationRequest) -> SystemDefinition:
+        if request.component_ids:
+            return self.repository.build_system(request.component_ids)
+        return self.repository.get(request.system_id)
+
     @staticmethod
     def _normalize(values: np.ndarray) -> np.ndarray:
         total = float(values.sum())
@@ -28,7 +33,7 @@ class ThermodynamicVLEService:
         return values / total
 
     def calculate(self, request: CalculationRequest) -> CalculationResult:
-        system = self.repository.get(request.system_id)
+        system = self._system(request)
         request = validate_request(request, system)
         if request.calculation_type is CalculationType.BUBL_P:
             return self._bubl_p(request)
@@ -41,7 +46,7 @@ class ThermodynamicVLEService:
         raise InputValidationError(f"Tipo de cálculo no soportado: {request.calculation_type.value}.")
 
     def _gamma(self, request: CalculationRequest, x: np.ndarray, temperature_k: float) -> np.ndarray:
-        system = self.repository.get(request.system_id)
+        system = self._system(request)
         return activity_coefficients(request.activity_model, system, temperature_k, x)
 
     def _correction_terms(
@@ -53,7 +58,7 @@ class ThermodynamicVLEService:
         y: np.ndarray,
         psat: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        system = self.repository.get(request.system_id)
+        system = self._system(request)
         enabled = request.vapor_model is VaporModel.GAMMA_PHI
         phi = phi_mixture(system.components, temperature_k, pressure_kpa, y, enabled=enabled)
         phi_sat = np.array(
@@ -80,7 +85,7 @@ class ThermodynamicVLEService:
         x_for_gamma: np.ndarray,
         y_for_phi: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        system = self.repository.get(request.system_id)
+        system = self._system(request)
         psat = np.array([psat_kpa(component, temperature_k) for component in system.components], dtype=float)
         gamma = self._gamma(request, x_for_gamma, temperature_k)
         phi, phi_sat, poynting = self._correction_terms(
@@ -92,7 +97,7 @@ class ThermodynamicVLEService:
     def _bubl_at_temperature(
         self, request: CalculationRequest, temperature_k: float, pressure_guess: float | None = None
     ) -> tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, tuple[dict[str, float], ...]]:
-        system = self.repository.get(request.system_id)
+        system = self._system(request)
         x = np.asarray(request.composition, dtype=float)
         psat = np.array([psat_kpa(component, temperature_k) for component in system.components], dtype=float)
         gamma = self._gamma(request, x, temperature_k)
@@ -124,7 +129,7 @@ class ThermodynamicVLEService:
     def _dew_at_temperature(
         self, request: CalculationRequest, temperature_k: float
     ) -> tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, tuple[dict[str, float], ...]]:
-        system = self.repository.get(request.system_id)
+        system = self._system(request)
         y = np.asarray(request.composition, dtype=float)
         x = y.copy()
         pressure = 101.325
@@ -158,7 +163,7 @@ class ThermodynamicVLEService:
         return self._result(request, request.fixed_value, pressure, x, np.asarray(request.composition), psat, gamma, phi, phi_sat, poynting, k, history)
 
     def _temperature_bounds(self, request: CalculationRequest) -> tuple[float, float]:
-        system = self.repository.get(request.system_id)
+        system = self._system(request)
         tsats = [tsat_k_at_pressure(component, request.fixed_value) for component in system.components]
         lower = max(min(tsats) * 0.7, max(component.antoine.t_min_c + 273.15 for component in system.components if component.antoine))
         upper = min(max(tsats) * 1.3, min(component.antoine.t_max_c + 273.15 for component in system.components if component.antoine))
@@ -246,7 +251,7 @@ class ThermodynamicVLEService:
         *,
         pressure_residual: float = 0.0,
     ) -> CalculationResult:
-        system = self.repository.get(request.system_id)
+        system = self._system(request)
         residual = history[-1]["residual"] if history else 0.0
         sources = tuple(
             sorted(
@@ -305,7 +310,7 @@ class ThermodynamicVLEService:
         system = self.repository.get(system_id)
         if len(system.components) != 2:
             raise ValueError("Los diagramas Pxy/Txy se generan solo para sistemas binarios.")
-        xs = np.linspace(0.01, 0.99, 41)
+        xs = np.linspace(0.01, 0.99, 21)
         liquid_values: list[float] = []
         vapor_axis: list[float] = []
         for x1 in xs:

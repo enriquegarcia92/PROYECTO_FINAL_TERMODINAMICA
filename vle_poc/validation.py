@@ -65,4 +65,5 @@ def validate_request(request: CalculationRequest, system: SystemDefinition) -> C
         composition=composition,
         tolerance=request.tolerance,
         max_iterations=request.max_iterations,
+        component_ids=request.component_ids,
     )

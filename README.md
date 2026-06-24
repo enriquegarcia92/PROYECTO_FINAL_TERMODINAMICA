@@ -14,7 +14,8 @@ Esta documentación está escrita para Windows. Aunque el código pueda ejecutar
 - Flujos BUBL P, DEW P, BUBL T y DEW T con motor termodinámico real.
 - Antoine con convención `ln(Psat[kPa]) = A - B/(T[°C] + C)`.
 - Corrección gamma-phi con Pitzer/virial, `phi_i`, `phi_i_sat` y Poynting.
-- Sistemas binarios y ternario demostrativos.
+- Constructor dinámico de sistemas: el usuario elige sustancias desde el catálogo global y arma el sistema componente por componente.
+- Plantillas demostrativas internas para validación rápida, sin duplicar propiedades puras.
 - Selección de Wilson, Margules y Van Laar.
 - Comparación visual con `phi = 1`.
 - Diagramas Pxy/Txy exportables a PNG/PDF mediante ventana “Guardar como”.
@@ -26,6 +27,26 @@ Esta documentación está escrita para Windows. Aunque el código pueda ejecutar
 ## Regla de unidades de temperatura
 
 El usuario ingresa temperaturas en grados Celsius (`°C`). Internamente, la aplicación convierte esas temperaturas a Kelvin (`K`) antes de enviarlas al servicio de cálculo, porque las fórmulas termodinámicas requieren temperatura absoluta. Los resultados y reportes pueden mostrar ambas unidades para trazabilidad.
+
+## Construcción dinámica del sistema VLE
+
+En la vista **Nuevo cálculo**, el sistema ya no se selecciona como una mezcla fija. Ahora se construye así:
+
+1. Seleccione la primera sustancia desde el catálogo.
+2. Use **Agregar componente** para incorporar la segunda sustancia.
+3. Repita el proceso si necesita una mezcla de más componentes.
+4. Complete la tabla de composición.
+5. Ejecute el cálculo cuando el sistema tenga al menos 2 componentes válidos.
+
+Reglas actuales:
+
+- Mínimo para ejecutar VLE: 2 componentes.
+- Máximo recomendado y programado para esta versión: 5 componentes.
+- No se permiten sustancias repetidas.
+- Wilson se permite de 2 a 5 componentes solo si existen todos los parámetros binarios requeridos.
+- Margules y Van Laar se permiten únicamente para sistemas binarios con parámetros `A12/A21` completos.
+- Los diagramas Pxy/Txy se habilitan para sistemas binarios. Para 3 a 5 componentes se requiere definir cortes composicionales, lo cual queda como mejora posterior.
+- Si faltan Antoine, propiedades críticas, volumen líquido o parámetros binarios, el cálculo se bloquea con un mensaje amigable. El programa no inventa datos.
 
 ## Opción recomendada para usuarios: ejecutar con doble clic
 

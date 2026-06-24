@@ -1,6 +1,6 @@
 """Menú de consola mínimo que consume el mismo contrato que la GUI."""
 
-from vle_poc.domain import ActivityModel, CalculationRequest, CalculationType, VaporModel
+from vle_poc.domain import MAX_COMPONENTS, MIN_COMPONENTS, ActivityModel, CalculationRequest, CalculationType, VaporModel
 from vle_poc.repository import DataRepository
 from vle_poc.service import SIMULATION_WARNING, ThermodynamicVLEService
 from vle_poc.units import celsius_to_kelvin, kelvin_to_celsius
@@ -24,7 +24,23 @@ def main() -> int:
     print(SIMULATION_WARNING)
     try:
         calculation = choose("Tipo de cálculo", [(item.value, item) for item in CalculationType])
-        system = choose("Sistema", [(item.name, item) for item in repository.all_systems()])
+        selected_components: list[str] = []
+        while len(selected_components) < MAX_COMPONENTS:
+            component = choose(
+                "Seleccione sustancia para agregar",
+                [
+                    (f"{item.name} ({item.formula})", item)
+                    for item in repository.all_components()
+                    if item.id not in selected_components
+                ],
+            )
+            selected_components.append(component.id)
+            print("Sistema actual:", " / ".join(repository.get_component(item).name for item in selected_components))
+            if len(selected_components) >= MIN_COMPONENTS:
+                more = input("¿Agregar otra sustancia? (s/N): ").strip().lower()
+                if more != "s":
+                    break
+        system = repository.build_system(tuple(selected_components))
         activity = choose("Modelo de actividad", [(item.value, item) for item in ActivityModel])
         vapor = choose("Modelo de vapor", [(item.value, item) for item in VaporModel])
         variable = calculation.fixed_variable
@@ -35,7 +51,15 @@ def main() -> int:
         raw = input(f"Ingrese {len(system.components)} fracciones molares separadas por coma: ")
         composition = tuple(float(value.strip()) for value in raw.split(","))
         result = service.calculate(
-            CalculationRequest(calculation, system.id, activity, vapor, fixed_value, composition)
+            CalculationRequest(
+                calculation,
+                "dynamic",
+                activity,
+                vapor,
+                fixed_value,
+                composition,
+                component_ids=tuple(selected_components),
+            )
         )
     except (ValueError, InputValidationError) as exc:
         print(f"Error: {exc}")

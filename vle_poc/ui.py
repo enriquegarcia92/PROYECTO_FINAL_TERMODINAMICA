@@ -39,7 +39,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .domain import ActivityModel, CalculationRequest, CalculationResult, CalculationType, VaporModel
+from .domain import MAX_COMPONENTS, ActivityModel, CalculationRequest, CalculationResult, CalculationType, VaporModel
 from .exporters import format_result_txt
 from .repository import DataRepository
 from .service import SIMULATION_WARNING, ThermodynamicVLEService
@@ -129,6 +129,7 @@ class CalculationPage(QWidget):
         super().__init__()
         self.repository = repository
         self.service = service
+        self.selected_component_ids: list[str] = ["cyclohexane"]
         layout = QVBoxLayout(self)
         layout.addLayout(page_header("Nuevo cálculo", "Configure el flujo VLE que deberá resolver el núcleo termodinámico."))
         layout.addWidget(warning_banner())
@@ -139,9 +140,12 @@ class CalculationPage(QWidget):
         self.calculation_combo = QComboBox()
         for item in CalculationType:
             self.calculation_combo.addItem(item.value, item.name)
-        self.system_combo = QComboBox()
-        for system in repository.all_systems():
-            self.system_combo.addItem(system.name, system.id)
+        self.component_combo = QComboBox()
+        for component in repository.all_components():
+            self.component_combo.addItem(f"{component.name} ({component.formula})", component.id)
+        self.add_component_button = QPushButton("Agregar componente")
+        self.add_component_button.setObjectName("secondaryButton")
+        self.add_component_button.clicked.connect(self._add_component)
         self.activity_combo = QComboBox()
         for item in ActivityModel:
             self.activity_combo.addItem(item.value, item.name)
@@ -154,10 +158,11 @@ class CalculationPage(QWidget):
         self.fixed_value.setValue(76.850)
         self.fixed_label = QLabel("Temperatura (°C)")
         setup_form.addRow("Tipo de cálculo", self.calculation_combo)
-        setup_form.addRow("Sistema", self.system_combo)
         setup_form.addRow("Modelo de actividad", self.activity_combo)
         setup_form.addRow("Fase vapor", self.vapor_combo)
         setup_form.addRow(self.fixed_label, self.fixed_value)
+        setup_form.addRow("Sustancia", self.component_combo)
+        setup_form.addRow(self.add_component_button)
         top.addWidget(setup, 1)
 
         numerical = QGroupBox("Control numérico")
@@ -176,6 +181,15 @@ class CalculationPage(QWidget):
         numerical_form.addRow(note)
         top.addWidget(numerical, 1)
         layout.addLayout(top)
+
+        selected_group = QGroupBox(f"Sistema construido (máximo {MAX_COMPONENTS} sustancias)")
+        selected_layout = QVBoxLayout(selected_group)
+        self.component_table = QTableWidget(0, 3)
+        self.component_table.setHorizontalHeaderLabels(["Sustancia", "Fórmula", "Acción"])
+        self.component_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.component_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        selected_layout.addWidget(self.component_table)
+        layout.addWidget(selected_group)
 
         composition_group = QGroupBox("Composición conocida")
         composition_layout = QVBoxLayout(composition_group)
@@ -201,18 +215,49 @@ class CalculationPage(QWidget):
         action_row.addWidget(run)
         layout.addLayout(action_row)
 
-        self.system_combo.currentIndexChanged.connect(self._populate_composition)
         self.calculation_combo.currentIndexChanged.connect(self._update_fixed_variable)
         self.composition_table.itemChanged.connect(self._update_total)
+        self._populate_component_table()
         self._populate_composition()
         self._update_fixed_variable()
 
+    def _add_component(self) -> None:
+        component_id = self.component_combo.currentData()
+        if component_id in self.selected_component_ids:
+            QMessageBox.warning(self, "Componente repetido", "Esa sustancia ya forma parte del sistema.")
+            return
+        if len(self.selected_component_ids) >= MAX_COMPONENTS:
+            QMessageBox.warning(self, "Límite alcanzado", f"El máximo permitido es {MAX_COMPONENTS} sustancias.")
+            return
+        self.selected_component_ids.append(component_id)
+        self._populate_component_table()
+        self._populate_composition()
+
+    def _remove_component(self, component_id: str) -> None:
+        if component_id in self.selected_component_ids:
+            self.selected_component_ids.remove(component_id)
+            self._populate_component_table()
+            self._populate_composition()
+
+    def _populate_component_table(self) -> None:
+        self.component_table.setRowCount(len(self.selected_component_ids))
+        for row, component_id in enumerate(self.selected_component_ids):
+            component = self.repository.get_component(component_id)
+            name = QTableWidgetItem(component.name)
+            formula = QTableWidgetItem(component.formula)
+            remove = QPushButton("Quitar")
+            remove.setObjectName("secondaryButton")
+            remove.clicked.connect(lambda checked=False, cid=component_id: self._remove_component(cid))
+            self.component_table.setItem(row, 0, name)
+            self.component_table.setItem(row, 1, formula)
+            self.component_table.setCellWidget(row, 2, remove)
+
     def _populate_composition(self) -> None:
-        system = self.repository.get(self.system_combo.currentData())
+        components = tuple(self.repository.get_component(component_id) for component_id in self.selected_component_ids)
         self.composition_table.blockSignals(True)
-        self.composition_table.setRowCount(len(system.components))
-        equal = 1.0 / len(system.components)
-        for row, component in enumerate(system.components):
+        self.composition_table.setRowCount(len(components))
+        equal = 1.0 / len(components) if components else 0.0
+        for row, component in enumerate(components):
             name = QTableWidgetItem(component.name)
             name.setFlags(name.flags() & ~Qt.ItemFlag.ItemIsEditable)
             formula = QTableWidgetItem(component.formula)
@@ -267,7 +312,7 @@ class CalculationPage(QWidget):
             calculation_type = CalculationType[self.calculation_combo.currentData()]
             request = CalculationRequest(
                 calculation_type=calculation_type,
-                system_id=self.system_combo.currentData(),
+                system_id="dynamic",
                 activity_model=ActivityModel[self.activity_combo.currentData()],
                 vapor_model=VaporModel[self.vapor_combo.currentData()],
                 fixed_value=(
@@ -278,6 +323,7 @@ class CalculationPage(QWidget):
                 composition=self._composition(),
                 tolerance=self.tolerance.value(),
                 max_iterations=self.iterations.value(),
+                component_ids=tuple(self.selected_component_ids),
             )
             self.calculated.emit(self.service.calculate(request))
         except (InputValidationError, ValueError) as exc:
@@ -435,7 +481,12 @@ class DiagramPage(QWidget):
         layout.addWidget(self.canvas, 1)
         self.type_combo.currentIndexChanged.connect(self._update_fixed_control)
         self._update_fixed_control()
-        self.generate()
+        axes = self.figure.add_subplot(111)
+        axes.set_title("Configure el diagrama y presione Generar")
+        axes.set_xlabel("Fracción molar")
+        axes.set_ylabel("Variable de equilibrio")
+        axes.grid(alpha=0.22)
+        self.canvas.draw()
 
     def _update_fixed_control(self) -> None:
         if self.type_combo.currentText() == "Pxy":

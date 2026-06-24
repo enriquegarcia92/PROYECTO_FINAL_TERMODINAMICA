@@ -1,7 +1,8 @@
 {
   "metadata": {
-    "version": "0.2.0-real",
+    "version": "0.3.0-dynamic-components",
     "warning": "Cálculos reales solo para sistemas/modelos con datos completos documentados.",
+    "max_components": 5,
     "units": {
       "tc_k": "K",
       "pc_kpa": "kPa",
@@ -9,171 +10,171 @@
       "antoine": "ln(Psat[kPa]) = A - B/(T[°C] + C)"
     }
   },
-  "systems": [
+  "components": [
+    {
+      "id": "cyclohexane",
+      "name": "Ciclohexano",
+      "formula": "C6H12",
+      "tc_k": 553.6,
+      "pc_kpa": 4080.0,
+      "omega": 0.209,
+      "liquid_molar_volume_m3_mol": 0.000108,
+      "antoine": {
+        "a": 13.6568,
+        "b": 2723.44,
+        "c": 220.618,
+        "t_min_c": 9.0,
+        "t_max_c": 105.0,
+        "convention": "ln_kpa_celsius",
+        "source": "Smith, Van Ness & Abbott, Tabla B.2."
+      }
+    },
+    {
+      "id": "n_heptane",
+      "name": "n-Heptano",
+      "formula": "C7H16",
+      "tc_k": 540.2,
+      "pc_kpa": 2740.0,
+      "omega": 0.349,
+      "liquid_molar_volume_m3_mol": 0.000147,
+      "antoine": {
+        "a": 13.8622,
+        "b": 2910.26,
+        "c": 216.432,
+        "t_min_c": 4.0,
+        "t_max_c": 123.0,
+        "convention": "ln_kpa_celsius",
+        "source": "Smith, Van Ness & Abbott, Tabla B.2."
+      }
+    },
+    {
+      "id": "ethanol",
+      "name": "Etanol",
+      "formula": "C2H6O",
+      "tc_k": 514.0,
+      "pc_kpa": 6137.0,
+      "omega": 0.644,
+      "liquid_molar_volume_m3_mol": 0.0000585,
+      "antoine": {
+        "a": 16.8958,
+        "b": 3795.17,
+        "c": 230.918,
+        "t_min_c": 3.0,
+        "t_max_c": 96.0,
+        "convention": "ln_kpa_celsius",
+        "source": "Smith, Van Ness & Abbott, Tabla B.2."
+      }
+    },
+    {
+      "id": "toluene",
+      "name": "Tolueno",
+      "formula": "C7H8",
+      "tc_k": 591.8,
+      "pc_kpa": 4100.0,
+      "omega": 0.264,
+      "liquid_molar_volume_m3_mol": 0.000106,
+      "antoine": {
+        "a": 13.9320,
+        "b": 3056.96,
+        "c": 217.625,
+        "t_min_c": 13.0,
+        "t_max_c": 136.0,
+        "convention": "ln_kpa_celsius",
+        "source": "Smith, Van Ness & Abbott, Tabla B.2."
+      }
+    },
+    {
+      "id": "acetone",
+      "name": "Acetona",
+      "formula": "C3H6O",
+      "tc_k": 508.1,
+      "pc_kpa": 4700.0,
+      "omega": 0.307,
+      "liquid_molar_volume_m3_mol": 0.000074,
+      "antoine": {
+        "a": 14.3145,
+        "b": 2756.22,
+        "c": 228.060,
+        "t_min_c": -26.0,
+        "t_max_c": 77.0,
+        "convention": "ln_kpa_celsius",
+        "source": "Smith, Van Ness & Abbott, Tabla B.2."
+      }
+    },
+    {
+      "id": "methanol",
+      "name": "Metanol",
+      "formula": "CH4O",
+      "tc_k": 512.6,
+      "pc_kpa": 8096.0,
+      "omega": 0.565,
+      "liquid_molar_volume_m3_mol": 0.0000407,
+      "antoine": {
+        "a": 16.5785,
+        "b": 3638.27,
+        "c": 239.500,
+        "t_min_c": -11.0,
+        "t_max_c": 83.0,
+        "convention": "ln_kpa_celsius",
+        "source": "Smith, Van Ness & Abbott, Tabla B.2."
+      }
+    },
+    {
+      "id": "benzene",
+      "name": "Benceno",
+      "formula": "C6H6",
+      "tc_k": 562.2,
+      "pc_kpa": 4890.0,
+      "omega": 0.212,
+      "liquid_molar_volume_m3_mol": 0.0000894,
+      "antoine": {
+        "a": 13.7819,
+        "b": 2726.81,
+        "c": 217.572,
+        "t_min_c": 6.0,
+        "t_max_c": 104.0,
+        "convention": "ln_kpa_celsius",
+        "source": "Smith, Van Ness & Abbott, Tabla B.2."
+      }
+    }
+  ],
+  "binary_parameters": {
+    "Wilson": {
+      "cyclohexane|n_heptane": {
+        "source": "Smith, Van Ness & Abbott, problema 14.54(h): Λ12=1.2996, Λ21=0.7046 para ciclohexano(1)/n-heptano(2).",
+        "type": "dimensionless_lambda",
+        "value": 1.2996
+      },
+      "n_heptane|cyclohexane": {
+        "source": "Smith, Van Ness & Abbott, problema 14.54(h): Λ12=1.2996, Λ21=0.7046 para ciclohexano(1)/n-heptano(2).",
+        "type": "dimensionless_lambda",
+        "value": 0.7046
+      }
+    },
+    "Margules": {},
+    "Van Laar": {}
+  },
+  "templates": [
     {
       "id": "cyclohexane_n_heptane",
       "name": "Ciclohexano / n-Heptano",
-      "description": "Sistema binario casi ideal para validar burbuja/rocío con datos Antoine y Wilson documentados.",
+      "description": "Plantilla binaria casi ideal con Wilson documentado.",
       "kind": "Casi ideal",
-      "available_models": ["Wilson", "Margules", "Van Laar"],
-      "binary_parameters": {
-        "Wilson": {
-          "source": "Smith, Van Ness & Abbott, problema 14.54(h): Λ12=1.2996, Λ21=0.7046 para ciclohexano(1)/n-heptano(2).",
-          "type": "dimensionless_lambda",
-          "pairs": {
-            "cyclohexane|n_heptane": 1.2996,
-            "n_heptane|cyclohexane": 0.7046
-          }
-        }
-      },
-      "components": [
-        {
-          "id": "cyclohexane",
-          "name": "Ciclohexano",
-          "formula": "C6H12",
-          "tc_k": 553.6,
-          "pc_kpa": 4080.0,
-          "omega": 0.209,
-          "liquid_molar_volume_m3_mol": 0.000108,
-          "antoine": {
-            "a": 13.6568,
-            "b": 2723.44,
-            "c": 220.618,
-            "t_min_c": 9.0,
-            "t_max_c": 105.0,
-            "convention": "ln_kpa_celsius",
-            "source": "Smith, Van Ness & Abbott, Tabla B.2."
-          }
-        },
-        {
-          "id": "n_heptane",
-          "name": "n-Heptano",
-          "formula": "C7H16",
-          "tc_k": 540.2,
-          "pc_kpa": 2740.0,
-          "omega": 0.349,
-          "liquid_molar_volume_m3_mol": 0.000147,
-          "antoine": {
-            "a": 13.8622,
-            "b": 2910.26,
-            "c": 216.432,
-            "t_min_c": 4.0,
-            "t_max_c": 123.0,
-            "convention": "ln_kpa_celsius",
-            "source": "Smith, Van Ness & Abbott, Tabla B.2."
-          }
-        }
-      ]
+      "component_ids": ["cyclohexane", "n_heptane"]
     },
     {
       "id": "ethanol_toluene",
       "name": "Etanol / Tolueno",
-      "description": "Sistema binario no ideal; requiere parámetros binarios documentados antes de habilitar cálculos reales.",
+      "description": "Plantilla binaria no ideal; requiere parámetros binarios antes de habilitar cálculos reales.",
       "kind": "Azeotrópico",
-      "available_models": ["Wilson", "Margules", "Van Laar"],
-      "binary_parameters": {},
-      "components": [
-        {
-          "id": "ethanol",
-          "name": "Etanol",
-          "formula": "C2H6O",
-          "tc_k": 514.0,
-          "pc_kpa": 6137.0,
-          "omega": 0.644,
-          "liquid_molar_volume_m3_mol": 0.0000585,
-          "antoine": {
-            "a": 16.8958,
-            "b": 3795.17,
-            "c": 230.918,
-            "t_min_c": 3.0,
-            "t_max_c": 96.0,
-            "convention": "ln_kpa_celsius",
-            "source": "Smith, Van Ness & Abbott, Tabla B.2."
-          }
-        },
-        {
-          "id": "toluene",
-          "name": "Tolueno",
-          "formula": "C7H8",
-          "tc_k": 591.8,
-          "pc_kpa": 4100.0,
-          "omega": 0.264,
-          "liquid_molar_volume_m3_mol": 0.000106,
-          "antoine": {
-            "a": 13.9320,
-            "b": 3056.96,
-            "c": 217.625,
-            "t_min_c": 13.0,
-            "t_max_c": 136.0,
-            "convention": "ln_kpa_celsius",
-            "source": "Smith, Van Ness & Abbott, Tabla B.2."
-          }
-        }
-      ]
+      "component_ids": ["ethanol", "toluene"]
     },
     {
       "id": "acetone_methanol_benzene",
       "name": "Acetona / Metanol / Benceno",
-      "description": "Sistema ternario para validar estructura multicomponente; requiere parámetros Wilson documentados para cálculos reales.",
+      "description": "Plantilla ternaria; requiere parámetros Wilson documentados para cálculos reales.",
       "kind": "Multicomponente",
-      "available_models": ["Wilson", "Margules", "Van Laar"],
-      "binary_parameters": {},
-      "components": [
-        {
-          "id": "acetone",
-          "name": "Acetona",
-          "formula": "C3H6O",
-          "tc_k": 508.1,
-          "pc_kpa": 4700.0,
-          "omega": 0.307,
-          "liquid_molar_volume_m3_mol": 0.000074,
-          "antoine": {
-            "a": 14.3145,
-            "b": 2756.22,
-            "c": 228.060,
-            "t_min_c": -26.0,
-            "t_max_c": 77.0,
-            "convention": "ln_kpa_celsius",
-            "source": "Smith, Van Ness & Abbott, Tabla B.2."
-          }
-        },
-        {
-          "id": "methanol",
-          "name": "Metanol",
-          "formula": "CH4O",
-          "tc_k": 512.6,
-          "pc_kpa": 8096.0,
-          "omega": 0.565,
-          "liquid_molar_volume_m3_mol": 0.0000407,
-          "antoine": {
-            "a": 16.5785,
-            "b": 3638.27,
-            "c": 239.500,
-            "t_min_c": -11.0,
-            "t_max_c": 83.0,
-            "convention": "ln_kpa_celsius",
-            "source": "Smith, Van Ness & Abbott, Tabla B.2."
-          }
-        },
-        {
-          "id": "benzene",
-          "name": "Benceno",
-          "formula": "C6H6",
-          "tc_k": 562.2,
-          "pc_kpa": 4890.0,
-          "omega": 0.212,
-          "liquid_molar_volume_m3_mol": 0.0000894,
-          "antoine": {
-            "a": 13.7819,
-            "b": 2726.81,
-            "c": 217.572,
-            "t_min_c": 6.0,
-            "t_max_c": 104.0,
-            "convention": "ln_kpa_celsius",
-            "source": "Smith, Van Ness & Abbott, Tabla B.2."
-          }
-        }
-      ]
+      "component_ids": ["acetone", "methanol", "benzene"]
     }
   ]
 }

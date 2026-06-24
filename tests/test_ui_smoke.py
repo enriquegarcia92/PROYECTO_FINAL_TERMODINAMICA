@@ -23,6 +23,10 @@ def test_gui_can_run_a_mock_calculation() -> None:
     window = MainWindow()
     assert window.calculation_page.fixed_label.text() == "Temperatura (°C)"
     assert window.calculation_page.fixed_value.value() == 76.85
+    window.calculation_page.component_combo.setCurrentIndex(
+        window.calculation_page.component_combo.findData("n_heptane")
+    )
+    window.calculation_page._add_component()
     window.calculation_page._run()
     assert window.stack.currentIndex() == 2
     assert window.results_page.content.isVisible() is False or window.results_page.content.isHidden() is False

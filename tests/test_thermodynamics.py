@@ -88,10 +88,15 @@ def test_bubl_t_real_wilson_gamma_phi_is_physical() -> None:
 
 def test_bubl_t_ideal_reference_matches_manual_value(tmp_path: Path) -> None:
     source = json.loads(Path("datos/base_datos_VLE.json").read_text(encoding="utf-8"))
-    system = source["systems"][0]
-    system["binary_parameters"]["Wilson"]["pairs"] = {
-        "cyclohexane|n_heptane": 1.0,
-        "n_heptane|cyclohexane": 1.0,
+    source["binary_parameters"]["Wilson"]["cyclohexane|n_heptane"] = {
+        "source": "Prueba ideal",
+        "type": "dimensionless_lambda",
+        "value": 1.0,
+    }
+    source["binary_parameters"]["Wilson"]["n_heptane|cyclohexane"] = {
+        "source": "Prueba ideal",
+        "type": "dimensionless_lambda",
+        "value": 1.0,
     }
     db_path = tmp_path / "db.json"
     db_path.write_text(json.dumps(source), encoding="utf-8")
