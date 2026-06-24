@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 from scipy.optimize import brentq
 
 from .activity import activity_coefficients
 from .domain import ActivityModel, CalculationRequest, CalculationResult, CalculationType, SystemDefinition, VaporModel
 from .fugacity import phi_mixture, phi_sat_pitzer, poynting_factor
+from .parameter_fitter import ActivityParameterFitter
 from .properties import psat_kpa, tsat_k_at_pressure
 from .repository import DataRepository
 from .validation import InputValidationError, validate_request
@@ -19,11 +22,42 @@ SIMULATION_WARNING = "Cálculo termodinámico real cuando existen datos completo
 class ThermodynamicVLEService:
     def __init__(self, repository: DataRepository) -> None:
         self.repository = repository
+        self.parameter_fitter = ActivityParameterFitter()
+        self._active_system: SystemDefinition | None = None
+        self._parameter_warnings: tuple[str, ...] = ()
 
     def _system(self, request: CalculationRequest) -> SystemDefinition:
+        if self._active_system is not None:
+            return self._active_system
         if request.component_ids:
             return self.repository.build_system(request.component_ids)
         return self.repository.get(request.system_id)
+
+    def _base_system(self, request: CalculationRequest) -> SystemDefinition:
+        if request.component_ids:
+            return self.repository.build_system(request.component_ids)
+        return self.repository.get(request.system_id)
+
+    def _system_with_fitted_parameters(
+        self,
+        request: CalculationRequest,
+        system: SystemDefinition,
+    ) -> SystemDefinition:
+        component_ids = tuple(component.id for component in system.components)
+        fit_data = self.repository.fit_data_for(component_ids)
+        fitted = self.parameter_fitter.fit(system, request.activity_model, fit_data)
+        parameters = dict(system.binary_parameters)
+        parameters[request.activity_model.value] = fitted.parameters
+        warnings = list(fitted.warnings)
+        try:
+            self.repository.persist_calculated_parameters(request.activity_model.value, fitted.parameters)
+        except OSError as exc:
+            warnings.append(
+                "Los parámetros se calcularon en memoria, pero no se pudieron guardar en la base JSON: "
+                f"{exc}"
+            )
+        self._parameter_warnings = tuple(warnings)
+        return replace(system, binary_parameters=parameters)
 
     @staticmethod
     def _normalize(values: np.ndarray) -> np.ndarray:
@@ -33,17 +67,25 @@ class ThermodynamicVLEService:
         return values / total
 
     def calculate(self, request: CalculationRequest) -> CalculationResult:
-        system = self._system(request)
+        system = self._base_system(request)
         request = validate_request(request, system)
-        if request.calculation_type is CalculationType.BUBL_P:
-            return self._bubl_p(request)
-        if request.calculation_type is CalculationType.DEW_P:
-            return self._dew_p(request)
-        if request.calculation_type is CalculationType.BUBL_T:
-            return self._bubl_t(request)
-        if request.calculation_type is CalculationType.DEW_T:
-            return self._dew_t(request)
-        raise InputValidationError(f"Tipo de cálculo no soportado: {request.calculation_type.value}.")
+        previous_system = self._active_system
+        previous_warnings = self._parameter_warnings
+        self._parameter_warnings = ()
+        self._active_system = self._system_with_fitted_parameters(request, system)
+        try:
+            if request.calculation_type is CalculationType.BUBL_P:
+                return self._bubl_p(request)
+            if request.calculation_type is CalculationType.DEW_P:
+                return self._dew_p(request)
+            if request.calculation_type is CalculationType.BUBL_T:
+                return self._bubl_t(request)
+            if request.calculation_type is CalculationType.DEW_T:
+                return self._dew_t(request)
+            raise InputValidationError(f"Tipo de cálculo no soportado: {request.calculation_type.value}.")
+        finally:
+            self._active_system = previous_system
+            self._parameter_warnings = previous_warnings
 
     def _gamma(self, request: CalculationRequest, x: np.ndarray, temperature_k: float) -> np.ndarray:
         system = self._system(request)
@@ -291,8 +333,8 @@ class ThermodynamicVLEService:
                 "suma_x": float(abs(np.sum(x) - 1.0)),
                 "suma_y": float(abs(np.sum(y) - 1.0)),
             },
-            warnings=(),
-            message="Cálculo termodinámico real completado con datos documentados.",
+            warnings=self._parameter_warnings,
+            message="Cálculo termodinámico real completado con parámetros calculados desde datos VLE.",
             activity_model=request.activity_model.value,
             vapor_model=request.vapor_model.value,
             comparison_value=comparison,

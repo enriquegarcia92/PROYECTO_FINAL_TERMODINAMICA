@@ -17,6 +17,7 @@ class DataRepository:
         self._components: dict[str, Component] = {}
         self._systems: dict[str, SystemDefinition] = {}
         self._binary_parameters: dict[str, dict[str, Any]] = {}
+        self._vle_fit_data: dict[str, list[dict[str, Any]]] = {}
         self._load()
 
     def _parse_component(self, raw: dict[str, Any]) -> Component:
@@ -31,6 +32,7 @@ class DataRepository:
             raise FileNotFoundError(f"No se encontró la base de datos: {self.path}")
         raw = json.loads(self.path.read_text(encoding="utf-8"))
         self._binary_parameters = raw.get("binary_parameters", {})
+        self._vle_fit_data = raw.get("vle_fit_data", {})
 
         if "components" in raw:
             for component_raw in raw.get("components", []):
@@ -117,12 +119,54 @@ class DataRepository:
             binary_parameters=self._parameters_for(component_ids),
         )
 
+    def fit_data_for(self, component_ids: tuple[str, ...]) -> dict[str, list[dict[str, Any]]]:
+        selected_ids = set(component_ids)
+        selected: dict[str, list[dict[str, Any]]] = {}
+        for pair_key, points in self._vle_fit_data.items():
+            first, separator, second = pair_key.partition("|")
+            if separator and {first, second}.issubset(selected_ids):
+                selected[pair_key] = [dict(point) for point in points]
+        return selected
+
+    def persist_calculated_parameters(
+        self,
+        model: str,
+        parameters: dict[str, Any],
+    ) -> bool:
+        """Guarda parámetros calculados en el JSON si cambiaron.
+
+        Devuelve True si modificó el archivo; False si ya estaba actualizado.
+        """
+
+        if not self.path.exists():
+            raise FileNotFoundError(f"No se encontró la base de datos: {self.path}")
+        raw = json.loads(self.path.read_text(encoding="utf-8"))
+        raw.setdefault("binary_parameters", {})
+        model_bucket = raw["binary_parameters"].setdefault(model, {})
+        changed = False
+        for key, record in parameters.get("pairs", {}).items():
+            current = model_bucket.get(key)
+            if isinstance(current, dict) and isinstance(record, dict):
+                current_without_date = {k: v for k, v in current.items() if k != "calculated_at_utc"}
+                record_without_date = {k: v for k, v in record.items() if k != "calculated_at_utc"}
+                if current_without_date == record_without_date:
+                    continue
+            if current != record:
+                model_bucket[key] = record
+                changed = True
+        if not changed:
+            return False
+        self.path.write_text(json.dumps(raw, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        self._binary_parameters = raw.get("binary_parameters", {})
+        self._vle_fit_data = raw.get("vle_fit_data", {})
+        return True
+
     def _parameters_for(self, component_ids: tuple[str, ...]) -> dict[str, Any]:
         selected: dict[str, Any] = {}
         for model, parameters in self._binary_parameters.items():
-            pairs: dict[str, float] = {}
+            pairs: dict[str, Any] = {}
             sources: set[str] = set()
-            parameter_type = ""
+            parameter_types: set[str] = set()
             for first in component_ids:
                 for second in component_ids:
                     if first == second:
@@ -130,13 +174,21 @@ class DataRepository:
                     key = f"{first}|{second}"
                     if key in parameters:
                         item = parameters[key]
-                        pairs[key] = float(item["value"])
-                        parameter_type = item.get("type", parameter_type)
-                        if item.get("source"):
-                            sources.add(item["source"])
+                        if isinstance(item, dict):
+                            pairs[key] = dict(item)
+                            if item.get("type"):
+                                parameter_types.add(str(item["type"]))
+                            if item.get("source"):
+                                sources.add(str(item["source"]))
+                        else:
+                            pairs[key] = {
+                                "type": "dimensionless_lambda",
+                                "value": float(item),
+                            }
+                            parameter_types.add("dimensionless_lambda")
             if pairs:
                 selected[model] = {
-                    "type": parameter_type,
+                    "type": next(iter(parameter_types)) if len(parameter_types) == 1 else "mixed",
                     "source": " | ".join(sorted(sources)),
                     "pairs": pairs,
                 }

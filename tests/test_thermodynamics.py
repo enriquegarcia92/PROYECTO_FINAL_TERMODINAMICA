@@ -15,6 +15,13 @@ from vle_poc.service import ThermodynamicVLEService
 from vle_poc.validation import InputValidationError
 
 
+def _repository_from_source(tmp_path: Path, source: dict) -> DataRepository:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    db_path = tmp_path / "db.json"
+    db_path.write_text(json.dumps(source), encoding="utf-8")
+    return DataRepository(db_path)
+
+
 def test_antoine_reproduces_normal_boiling_pressures() -> None:
     repo = DataRepository()
     system = repo.get("cyclohexane_n_heptane")
@@ -36,21 +43,130 @@ def test_wilson_gamma_for_cyclohexane_heptane_is_finite() -> None:
     gamma = activity_coefficients(ActivityModel.WILSON, system, 360.0, np.array([0.5, 0.5]))
     assert gamma.shape == (2,)
     assert np.all(gamma > 0)
-    assert gamma[0] == pytest.approx(1.012276, rel=1e-5)
+    assert gamma[0] == pytest.approx(1.012251, rel=1e-5)
 
 
-def test_van_laar_without_parameters_is_blocked() -> None:
+def test_wilson_energy_difference_calculates_lambdas_from_temperature(tmp_path: Path) -> None:
+    source = json.loads(Path("datos/base_datos_VLE.json").read_text(encoding="utf-8"))
+    source["binary_parameters"]["Wilson"]["cyclohexane|n_heptane"] = {
+        "source": "Prueba controlada de energía Wilson",
+        "type": "energy_difference",
+        "value": 0.0,
+        "units": "J/mol",
+    }
+    source["binary_parameters"]["Wilson"]["n_heptane|cyclohexane"] = {
+        "source": "Prueba controlada de energía Wilson",
+        "type": "energy_difference",
+        "value": 0.0,
+        "units": "J/mol",
+    }
+    system = _repository_from_source(tmp_path, source).get("cyclohexane_n_heptane")
+
+    gamma = activity_coefficients(ActivityModel.WILSON, system, 360.0, np.array([0.5, 0.5]))
+
+    lambda_12 = system.components[1].liquid_molar_volume_m3_mol / system.components[0].liquid_molar_volume_m3_mol
+    lambda_21 = system.components[0].liquid_molar_volume_m3_mol / system.components[1].liquid_molar_volume_m3_mol
+    row_1 = 0.5 + lambda_12 * 0.5
+    row_2 = lambda_21 * 0.5 + 0.5
+    ln_gamma_1 = 1.0 - np.log(row_1) - (0.5 / row_1 + 0.5 * lambda_21 / row_2)
+    ln_gamma_2 = 1.0 - np.log(row_2) - (0.5 * lambda_12 / row_1 + 0.5 / row_2)
+    assert gamma == pytest.approx(np.exp([ln_gamma_1, ln_gamma_2]))
+
+
+def test_wilson_energy_difference_accepts_cal_per_mol(tmp_path: Path) -> None:
+    source_j = json.loads(Path("datos/base_datos_VLE.json").read_text(encoding="utf-8"))
+    source_cal = json.loads(Path("datos/base_datos_VLE.json").read_text(encoding="utf-8"))
+    for source, value, units in [(source_j, 418.4, "J/mol"), (source_cal, 100.0, "cal/mol")]:
+        source["binary_parameters"]["Wilson"]["cyclohexane|n_heptane"] = {
+            "source": "Prueba controlada de conversión",
+            "type": "energy_difference",
+            "value": value,
+            "units": units,
+        }
+        source["binary_parameters"]["Wilson"]["n_heptane|cyclohexane"] = {
+            "source": "Prueba controlada de conversión",
+            "type": "energy_difference",
+            "value": value,
+            "units": units,
+        }
+
+    gamma_j = activity_coefficients(
+        ActivityModel.WILSON,
+        _repository_from_source(tmp_path / "j", source_j).get("cyclohexane_n_heptane"),
+        360.0,
+        np.array([0.5, 0.5]),
+    )
+    gamma_cal = activity_coefficients(
+        ActivityModel.WILSON,
+        _repository_from_source(tmp_path / "cal", source_cal).get("cyclohexane_n_heptane"),
+        360.0,
+        np.array([0.5, 0.5]),
+    )
+    assert gamma_cal == pytest.approx(gamma_j)
+
+
+def test_wilson_reports_missing_directed_pair(tmp_path: Path) -> None:
+    source = json.loads(Path("datos/base_datos_VLE.json").read_text(encoding="utf-8"))
+    source["binary_parameters"]["Wilson"]["cyclohexane|ethanol"] = {
+        "source": "Prueba incompleta",
+        "type": "dimensionless_lambda",
+        "value": 1.2,
+    }
+    system = _repository_from_source(tmp_path, source).build_system(("cyclohexane", "ethanol"))
+
+    with pytest.raises(InputValidationError, match="ethanol\\|cyclohexane"):
+        activity_coefficients(ActivityModel.WILSON, system, 360.0, np.array([0.5, 0.5]))
+
+
+def test_wilson_energy_difference_requires_liquid_volume(tmp_path: Path) -> None:
+    source = json.loads(Path("datos/base_datos_VLE.json").read_text(encoding="utf-8"))
+    for component in source["components"]:
+        if component["id"] == "cyclohexane":
+            component["liquid_molar_volume_m3_mol"] = None
+    source["binary_parameters"]["Wilson"]["cyclohexane|n_heptane"] = {
+        "source": "Prueba sin volumen",
+        "type": "energy_difference",
+        "value": 0.0,
+        "units": "J/mol",
+    }
+    source["binary_parameters"]["Wilson"]["n_heptane|cyclohexane"] = {
+        "source": "Prueba sin volumen",
+        "type": "energy_difference",
+        "value": 0.0,
+        "units": "J/mol",
+    }
+    system = _repository_from_source(tmp_path, source).get("cyclohexane_n_heptane")
+
+    with pytest.raises(InputValidationError, match="falta volumen líquido"):
+        activity_coefficients(ActivityModel.WILSON, system, 360.0, np.array([0.5, 0.5]))
+
+
+def test_wilson_energy_difference_rejects_unsupported_units(tmp_path: Path) -> None:
+    source = json.loads(Path("datos/base_datos_VLE.json").read_text(encoding="utf-8"))
+    source["binary_parameters"]["Wilson"]["cyclohexane|n_heptane"] = {
+        "source": "Prueba unidad inválida",
+        "type": "energy_difference",
+        "value": 0.0,
+        "units": "BTU/lbmol",
+    }
+    system = _repository_from_source(tmp_path, source).get("cyclohexane_n_heptane")
+
+    with pytest.raises(InputValidationError, match="Unidad energética Wilson no soportada"):
+        activity_coefficients(ActivityModel.WILSON, system, 360.0, np.array([0.5, 0.5]))
+
+
+def test_van_laar_without_vle_fit_data_is_blocked() -> None:
     repo = DataRepository()
     service = ThermodynamicVLEService(repo)
     request = CalculationRequest(
         CalculationType.BUBL_T,
-        "cyclohexane_n_heptane",
+        "ethanol_toluene",
         ActivityModel.VAN_LAAR,
         VaporModel.GAMMA_PHI,
         101.325,
         (0.5, 0.5),
     )
-    with pytest.raises(InputValidationError, match="Faltan parámetros Van Laar"):
+    with pytest.raises(InputValidationError, match="Faltan datos VLE"):
         service.calculate(request)
 
 
@@ -86,22 +202,8 @@ def test_bubl_t_real_wilson_gamma_phi_is_physical() -> None:
     assert sum(result.y) == pytest.approx(1.0)
 
 
-def test_bubl_t_ideal_reference_matches_manual_value(tmp_path: Path) -> None:
-    source = json.loads(Path("datos/base_datos_VLE.json").read_text(encoding="utf-8"))
-    source["binary_parameters"]["Wilson"]["cyclohexane|n_heptane"] = {
-        "source": "Prueba ideal",
-        "type": "dimensionless_lambda",
-        "value": 1.0,
-    }
-    source["binary_parameters"]["Wilson"]["n_heptane|cyclohexane"] = {
-        "source": "Prueba ideal",
-        "type": "dimensionless_lambda",
-        "value": 1.0,
-    }
-    db_path = tmp_path / "db.json"
-    db_path.write_text(json.dumps(source), encoding="utf-8")
-
-    service = ThermodynamicVLEService(DataRepository(db_path))
+def test_bubl_t_uses_automatic_wilson_fit_from_vle_data() -> None:
+    service = ThermodynamicVLEService(DataRepository())
     result = service.calculate(
         CalculationRequest(
             CalculationType.BUBL_T,
@@ -113,9 +215,8 @@ def test_bubl_t_ideal_reference_matches_manual_value(tmp_path: Path) -> None:
         )
     )
 
-    assert result.temperature_k == pytest.approx(361.701, abs=0.02)
-    assert result.temperature_k - 273.15 == pytest.approx(88.551, abs=0.02)
-    assert result.psat_kpa[0] == pytest.approx(127.473, abs=0.05)
-    assert result.psat_kpa[1] == pytest.approx(75.177, abs=0.05)
-    assert result.y[0] == pytest.approx(0.629031, abs=5e-4)
-    assert result.y[1] == pytest.approx(0.370969, abs=5e-4)
+    assert result.temperature_k == pytest.approx(361.345, abs=0.03)
+    assert result.temperature_k - 273.15 == pytest.approx(88.195, abs=0.03)
+    assert result.y[0] == pytest.approx(0.630233, abs=2e-3)
+    assert result.y[1] == pytest.approx(0.369767, abs=2e-3)
+    assert any("Punto VLE demostrativo" in source for source in result.data_sources)

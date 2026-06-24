@@ -43,10 +43,41 @@ Reglas actuales:
 - Mínimo para ejecutar VLE: 2 componentes.
 - Máximo recomendado y programado para esta versión: 5 componentes.
 - No se permiten sustancias repetidas.
-- Wilson se permite de 2 a 5 componentes solo si existen todos los parámetros binarios requeridos.
-- Margules y Van Laar se permiten únicamente para sistemas binarios con parámetros `A12/A21` completos.
+- Wilson se permite de 2 a 5 componentes solo si existen datos VLE para ajustar todos los pares binarios requeridos.
+- Margules y Van Laar se permiten únicamente para sistemas binarios con datos VLE suficientes para ajustar `A12/A21`.
 - Los diagramas Pxy/Txy se habilitan para sistemas binarios. Para 3 a 5 componentes se requiere definir cortes composicionales, lo cual queda como mejora posterior.
 - Si faltan Antoine, propiedades críticas, volumen líquido o parámetros binarios, el cálculo se bloquea con un mensaje amigable. El programa no inventa datos.
+
+## Parámetros Wilson
+
+Wilson puede usar dos formatos internos de parámetros binarios calculados:
+
+- `dimensionless_lambda`: `Λij` directo, positivo y adimensional.
+- `energy_difference`: energía `λij−λii` en `J/mol` o `cal/mol`, con la cual el programa calcula `Λij(T)` usando los volúmenes líquidos y la temperatura absoluta interna en Kelvin.
+
+En el flujo principal, el programa ajusta automáticamente las energías Wilson desde `vle_fit_data` antes de cada cálculo y las guarda con trazabilidad en `binary_parameters`. Si no hay datos VLE para un par, el cálculo se bloquea.
+
+## Parámetros Margules
+
+Margules usa parámetros binarios adimensionales `A12` y `A21`. El motor los ajusta automáticamente desde puntos VLE binarios con `x`, `y`, `P` y `T`:
+
+```text
+gamma_i = y_i P / (x_i Psat_i)
+```
+
+El ajuste resuelve el SEL de Margules y escribe los parámetros calculados en `binary_parameters` con fuente, residuales y número de puntos usados. `vle_fit_data` sigue siendo la fuente auditable.
+
+## Parámetros Van Laar
+
+Van Laar también usa parámetros binarios adimensionales `A12` y `A21`. El motor los ajusta automáticamente desde `vle_fit_data` antes de cada cálculo binario.
+
+El ajuste usa `gamma_i = y_i P / (x_i Psat_i)` y la forma inversa estándar con corchetes al cuadrado. Si los datos VLE faltan o producen `ln(gamma)` no válido, el cálculo se bloquea con mensaje amigable.
+
+## Datos VLE para ajuste automático
+
+La sección `vle_fit_data` de la base JSON contiene los puntos usados para ajustar modelos de actividad. Cada punto define par binario, fuente, temperatura, presión, composición líquida `x` y composición vapor `y`.
+
+El programa no obtiene parámetros desde la nada ni desde el resultado que está resolviendo. Primero lee datos VLE conocidos, calcula `Psat_i`, obtiene `gamma_i` y ajusta parámetros. Luego usa esos parámetros dentro del solver.
 
 ## Opción recomendada para usuarios: ejecutar con doble clic
 

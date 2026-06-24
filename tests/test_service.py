@@ -36,7 +36,7 @@ def test_multicomponent_result_has_three_rows() -> None:
     repository = DataRepository()
     service = ThermodynamicVLEService(repository)
     system = repository.get("acetone_methanol_benzene")
-    with pytest.raises(InputValidationError, match="Faltan parámetros Margules"):
+    with pytest.raises(InputValidationError, match="Margules automático solo está habilitado"):
         service.calculate(
             CalculationRequest(
                 CalculationType.DEW_T,

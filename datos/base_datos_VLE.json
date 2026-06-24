@@ -7,7 +7,11 @@
       "tc_k": "K",
       "pc_kpa": "kPa",
       "liquid_molar_volume_m3_mol": "m3/mol",
-      "antoine": "ln(Psat[kPa]) = A - B/(T[°C] + C)"
+      "antoine": "ln(Psat[kPa]) = A - B/(T[°C] + C)",
+      "wilson_dimensionless_lambda": "Λij directo, positivo y adimensional",
+      "wilson_energy_difference": "λij−λii en J/mol o cal/mol; Λij=(Vj/Vi)*exp(-(λij−λii)/(R*T))",
+      "margules_dimensionless_a": "A12/A21 adimensionales; pueden ajustarse desde x,y,P,T y gamma_i=yi*P/(xi*Psat_i)",
+      "van_laar_dimensionless_a": "A12/A21 adimensionales; pueden ajustarse desde x,y,P,T y gamma_i=yi*P/(xi*Psat_i)"
     }
   },
   "components": [
@@ -141,18 +145,79 @@
   "binary_parameters": {
     "Wilson": {
       "cyclohexane|n_heptane": {
-        "source": "Smith, Van Ness & Abbott, problema 14.54(h): Λ12=1.2996, Λ21=0.7046 para ciclohexano(1)/n-heptano(2).",
-        "type": "dimensionless_lambda",
-        "value": 1.2996
+        "source": "Punto VLE demostrativo ciclohexano/n-heptano derivado del problema 14.54(h) para validar ajuste automático. Sustituir por dato experimental para informe final.",
+        "calculated_from_vle": true,
+        "calculated_at_utc": "2026-06-24T03:30:21+00:00",
+        "points_used": 1,
+        "residual_sum_squares": 1.4380293138940171e-9,
+        "type": "energy_difference",
+        "value": 136.99077241739445,
+        "lambda_ij_minus_lambda_ii": 136.99077241739445,
+        "units": "J/mol"
       },
       "n_heptane|cyclohexane": {
-        "source": "Smith, Van Ness & Abbott, problema 14.54(h): Λ12=1.2996, Λ21=0.7046 para ciclohexano(1)/n-heptano(2).",
-        "type": "dimensionless_lambda",
-        "value": 0.7046
+        "source": "Punto VLE demostrativo ciclohexano/n-heptano derivado del problema 14.54(h) para validar ajuste automático. Sustituir por dato experimental para informe final.",
+        "calculated_from_vle": true,
+        "calculated_at_utc": "2026-06-24T03:30:21+00:00",
+        "points_used": 1,
+        "residual_sum_squares": 1.4380293138940171e-9,
+        "type": "energy_difference",
+        "value": 126.76222735804971,
+        "lambda_ij_minus_lambda_ii": 126.76222735804971,
+        "units": "J/mol"
       }
     },
-    "Margules": {},
-    "Van Laar": {}
+    "Margules": {
+      "cyclohexane|n_heptane": {
+        "source": "Punto VLE demostrativo ciclohexano/n-heptano derivado del problema 14.54(h) para validar ajuste automático. Sustituir por dato experimental para informe final.",
+        "calculated_from_vle": true,
+        "calculated_at_utc": "2026-06-24T03:30:21+00:00",
+        "points_used": 1,
+        "residual_sum_squares": 0.0,
+        "type": "dimensionless_a",
+        "value": 0.029147558202011925
+      },
+      "n_heptane|cyclohexane": {
+        "source": "Punto VLE demostrativo ciclohexano/n-heptano derivado del problema 14.54(h) para validar ajuste automático. Sustituir por dato experimental para informe final.",
+        "calculated_from_vle": true,
+        "calculated_at_utc": "2026-06-24T03:30:21+00:00",
+        "points_used": 1,
+        "residual_sum_squares": 0.0,
+        "type": "dimensionless_a",
+        "value": 0.04528455126046451
+      }
+    },
+    "Van Laar": {
+      "cyclohexane|n_heptane": {
+        "source": "Punto VLE demostrativo ciclohexano/n-heptano derivado del problema 14.54(h) para validar ajuste automático. Sustituir por dato experimental para informe final.",
+        "calculated_from_vle": true,
+        "calculated_at_utc": "2026-06-24T03:30:21+00:00",
+        "points_used": 1,
+        "residual_sum_squares": 1.88079096131566e-35,
+        "type": "dimensionless_a",
+        "value": 0.033499338101263994
+      },
+      "n_heptane|cyclohexane": {
+        "source": "Punto VLE demostrativo ciclohexano/n-heptano derivado del problema 14.54(h) para validar ajuste automático. Sustituir por dato experimental para informe final.",
+        "calculated_from_vle": true,
+        "calculated_at_utc": "2026-06-24T03:30:21+00:00",
+        "points_used": 1,
+        "residual_sum_squares": 1.88079096131566e-35,
+        "type": "dimensionless_a",
+        "value": 0.05107269596105811
+      }
+    }
+  },
+  "vle_fit_data": {
+    "cyclohexane|n_heptane": [
+      {
+        "source": "Punto VLE demostrativo ciclohexano/n-heptano derivado del problema 14.54(h) para validar ajuste automático. Sustituir por dato experimental para informe final.",
+        "temperature_k": 360.0,
+        "pressure_kpa": 94.85152995052616,
+        "x": [0.45, 0.55],
+        "y": [0.5842238765160485, 0.41577612348395143]
+      }
+    ]
   },
   "templates": [
     {
