@@ -18,7 +18,7 @@ Esta documentación está escrita para Windows. Aunque el código pueda ejecutar
 - Plantillas demostrativas internas para validación rápida, sin duplicar propiedades puras.
 - Selección de Wilson, Margules y Van Laar.
 - Comparación visual con `phi = 1`.
-- Diagramas Pxy/Txy exportables a PNG/PDF mediante ventana “Guardar como”.
+- Diagramas Pxy/Txy generados automáticamente con cada cálculo y exportables a PNG/PDF mediante ventana “Guardar como”.
 - Resultados exportables a TXT mediante ventana “Guardar como”.
 - Validaciones reales de composiciones, presión, temperatura y disponibilidad de parámetros.
 - CLI que consume el mismo contrato de dominio.
@@ -45,7 +45,7 @@ Reglas actuales:
 - No se permiten sustancias repetidas.
 - Wilson se permite de 2 a 5 componentes solo si existen datos VLE para ajustar todos los pares binarios requeridos.
 - Margules y Van Laar se permiten únicamente para sistemas binarios con datos VLE suficientes para ajustar `A12/A21`.
-- Los diagramas Pxy/Txy se habilitan para sistemas binarios. Para 3 a 5 componentes se requiere definir cortes composicionales, lo cual queda como mejora posterior.
+- Los diagramas se generan automáticamente: Pxy/Txy para binarios y cortes composicionales equivalentes para 3 a 5 componentes cuando el modelo lo permite.
 - Si faltan Antoine, propiedades críticas, volumen líquido o parámetros binarios, el cálculo se bloquea con un mensaje amigable. El programa no inventa datos.
 
 ## Parámetros Wilson
@@ -141,8 +141,9 @@ La aplicación también conserva una interfaz mínima de consola, requerida por 
 
 Desde la interfaz:
 
-- En la vista **Diagrama**, use `Guardar PNG` o `Guardar PDF`.
-- En la vista **Resultados**, después de ejecutar un cálculo, use `Guardar resultados TXT`.
+- Después de ejecutar un cálculo, la vista **Resultados** muestra automáticamente el diagrama asociado.
+- En **Resultados** o **Diagrama**, use `Guardar PNG` o `Guardar PDF` para exportar el gráfico del último cálculo.
+- En la vista **Resultados**, use `Guardar resultados TXT` para exportar el reporte numérico.
 
 En todos los casos se abre una ventana de Windows para elegir carpeta y nombre de archivo. La aplicación no obliga al usuario a guardar en una carpeta fija.
 

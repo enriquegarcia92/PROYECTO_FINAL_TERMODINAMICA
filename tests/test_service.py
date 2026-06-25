@@ -75,3 +75,46 @@ def test_dynamic_components_reproduce_template_bubl_t() -> None:
     )
     assert dynamic_result.temperature_k == pytest.approx(template_result.temperature_k)
     assert dynamic_result.y == pytest.approx(template_result.y)
+
+
+def test_phase_curve_for_result_generates_pxy_for_temperature_fixed_calculation() -> None:
+    repository = DataRepository()
+    service = ThermodynamicVLEService(repository)
+    result = service.calculate(
+        CalculationRequest(
+            CalculationType.BUBL_P,
+            "cyclohexane_n_heptane",
+            ActivityModel.WILSON,
+            VaporModel.COMPARE,
+            350.0,
+            (0.45, 0.55),
+        )
+    )
+
+    data = service.phase_curve_for_result(result)
+
+    assert data["diagram_type"][0] == "Pxy"
+    assert len(data["x"]) == 21
+    assert len(data["y"]) == 21
+    assert data["point_x"][0] == pytest.approx(result.x[0])
+    assert data["point_y"][0] == pytest.approx(result.y[0])
+
+
+def test_phase_curve_for_result_generates_txy_for_pressure_fixed_calculation() -> None:
+    repository = DataRepository()
+    service = ThermodynamicVLEService(repository)
+    result = service.calculate(
+        CalculationRequest(
+            CalculationType.BUBL_T,
+            "cyclohexane_n_heptane",
+            ActivityModel.WILSON,
+            VaporModel.COMPARE,
+            101.325,
+            (0.45, 0.55),
+        )
+    )
+
+    data = service.phase_curve_for_result(result)
+
+    assert data["diagram_type"][0] == "Txy"
+    assert data["point_value"][0] == pytest.approx(result.temperature_k)

@@ -392,5 +392,85 @@ class ThermodynamicVLEService:
             "title": np.asarray([f"{diagram_type} — {system.name} — {condition}"]),
         }
 
+    def phase_curve_for_result(self, result: CalculationResult) -> dict[str, np.ndarray]:
+        component_ids = self._component_ids_from_result(result)
+        if len(component_ids) < 2:
+            raise InputValidationError("El diagrama requiere al menos dos componentes.")
+        diagram_type = "Pxy" if result.calculation_type in {CalculationType.BUBL_P.value, CalculationType.DEW_P.value} else "Txy"
+        fixed_value = result.temperature_k if diagram_type == "Pxy" else result.pressure_kpa
+        activity_model = ActivityModel(result.activity_model)
+        vapor_model = VaporModel(result.vapor_model)
+        known_composition = result.x if result.calculation_type in {CalculationType.BUBL_P.value, CalculationType.BUBL_T.value} else result.y
+        main_name = result.component_names[0]
+        xs = np.linspace(0.01, 0.99, 21)
+        liquid_values: list[float] = []
+        vapor_axis: list[float] = []
+        point_x = result.x[0]
+        point_y = result.y[0]
+        for x1 in xs:
+            composition = self._composition_for_cut(float(x1), known_composition)
+            request = CalculationRequest(
+                CalculationType.BUBL_P if diagram_type == "Pxy" else CalculationType.BUBL_T,
+                "dynamic",
+                activity_model,
+                vapor_model,
+                fixed_value,
+                composition,
+                component_ids=component_ids,
+            )
+            curve_result = self.calculate(request)
+            liquid_values.append(curve_result.pressure_kpa if diagram_type == "Pxy" else curve_result.temperature_k)
+            vapor_axis.append(curve_result.y[0])
+        if diagram_type == "Pxy":
+            ylabel = "Presión (kPa)"
+            condition = f"T = {fixed_value - 273.15:.3f} °C"
+            point_value = result.pressure_kpa
+        else:
+            ylabel = "Temperatura (K)"
+            condition = f"P = {fixed_value:.3f} kPa"
+            point_value = result.temperature_k
+        cut_note = (
+            ""
+            if len(component_ids) == 2
+            else " — Corte composicional: se mantienen proporciones relativas de los demás componentes"
+        )
+        return {
+            "x": xs,
+            "y": np.asarray(vapor_axis),
+            "liquid": np.asarray(liquid_values),
+            "vapor": np.asarray(liquid_values),
+            "ylabel": np.asarray([ylabel]),
+            "title": np.asarray([f"{diagram_type} — {result.system_name} — {condition}{cut_note}"]),
+            "xlabel": np.asarray([f"Fracción molar de {main_name}"]),
+            "point_x": np.asarray([point_x]),
+            "point_y": np.asarray([point_y]),
+            "point_value": np.asarray([point_value]),
+            "diagram_type": np.asarray([diagram_type]),
+            "is_cut": np.asarray([1 if len(component_ids) > 2 else 0]),
+        }
+
+    @staticmethod
+    def _composition_for_cut(x1: float, base_composition: tuple[float, ...]) -> tuple[float, ...]:
+        if len(base_composition) == 2:
+            return (x1, 1.0 - x1)
+        remaining = 1.0 - x1
+        tail = np.asarray(base_composition[1:], dtype=float)
+        tail_sum = float(tail.sum())
+        if tail_sum <= 0:
+            weights = np.full(len(tail), 1.0 / len(tail))
+        else:
+            weights = tail / tail_sum
+        return tuple([x1, *list((weights * remaining).astype(float))])
+
+    def _component_ids_from_result(self, result: CalculationResult) -> tuple[str, ...]:
+        catalog = {component.name: component.id for component in self.repository.all_components()}
+        ids: list[str] = []
+        for name in result.component_names:
+            try:
+                ids.append(catalog[name])
+            except KeyError as exc:
+                raise InputValidationError(f"No se pudo reconstruir el sistema para graficar: {name}.") from exc
+        return tuple(ids)
+
 
 MockVLEService = ThermodynamicVLEService
