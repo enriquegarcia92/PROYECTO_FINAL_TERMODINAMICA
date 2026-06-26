@@ -49,6 +49,13 @@ from .units import celsius_to_kelvin, kelvin_to_celsius
 from .validation import InputValidationError
 
 
+EOS_MODEL_NAMES = {ActivityModel.REDLICH_KWONG.value, ActivityModel.SOAVE_REDLICH_KWONG.value}
+EOS_WARNING = (
+    "Este sistema se resuelve con EOS cúbica phi-phi. No usa Wilson/Margules/Van Laar porque contiene "
+    "gases ligeros/criogénicos o condiciones donde Antoine + gamma-phi sería científicamente incorrecto."
+)
+
+
 def page_header(title: str, description: str) -> QVBoxLayout:
     layout = QVBoxLayout()
     title_label = QLabel(title)
@@ -86,6 +93,42 @@ def card(title: str, value: str) -> QFrame:
 def draw_phase_curve(figure: Figure, data: dict[str, object]) -> None:
     figure.clear()
     axes = figure.add_subplot(111)
+    diagram_type = str(data.get("diagram_type", [""])[0])
+    if diagram_type == "Fugacidad RK":
+        x_axis = data["x"]
+        first_name = str(data.get("component_first", ["Componente 1"])[0])
+        second_name = str(data.get("component_second", ["Componente 2"])[0])
+        axes.plot(x_axis, data["phi_first"], color="#167467", linewidth=2.3, label=f"φ {first_name}")
+        axes.plot(x_axis, data["phi_second"], color="#d58a35", linewidth=2.3, label=f"φ {second_name}")
+        z_axes = axes.twinx()
+        z_axes.plot(x_axis, data["z"], color="#0f4c5c", linewidth=1.9, linestyle="--", label="Z vapor")
+        if "point_x" in data:
+            point_x = float(data["point_x"][0])
+            point_phi_first = float(data["point_phi_first"][0])
+            point_phi_second = float(data["point_phi_second"][0])
+            point_z = float(data["point_z"][0])
+            axes.scatter([point_x], [point_phi_first], color="#167467", s=42, zorder=5)
+            axes.scatter([point_x], [point_phi_second], color="#d58a35", s=42, zorder=5)
+            z_axes.scatter([point_x], [point_z], color="#0f4c5c", s=42, zorder=5)
+            axes.axvline(point_x, color="#6d858a", linestyle=":", linewidth=1.0, alpha=0.75)
+            axes.annotate(
+                f"Z={point_z:.4f}",
+                xy=(point_x, point_phi_first),
+                xytext=(8, 10),
+                textcoords="offset points",
+                color="#0f4c5c",
+            )
+        axes.set_xlabel(str(data.get("xlabel", ["Fracción molar"])[0]))
+        axes.set_ylabel(str(data["ylabel"][0]))
+        z_axes.set_ylabel(str(data.get("zlabel", ["Factor Z"])[0]))
+        axes.set_title(str(data["title"][0]))
+        axes.set_xlim(0, 1)
+        axes.grid(alpha=0.22)
+        lines, labels = axes.get_legend_handles_labels()
+        z_lines, z_labels = z_axes.get_legend_handles_labels()
+        axes.legend(lines + z_lines, labels + z_labels)
+        figure.tight_layout()
+        return
     x_axis = data["x"]
     y_axis = data["y"]
     liquid_values = data["liquid"]
@@ -298,15 +341,19 @@ class CalculationPage(QWidget):
         if system.id == VLLE_1427_SYSTEM_ID:
             self.system_warning.setText(VLLE_1427_WARNING)
             self.system_warning.show()
+        elif any(model in EOS_MODEL_NAMES for model in system.available_models):
+            self.system_warning.setText(EOS_WARNING)
+            self.system_warning.show()
         else:
             self.system_warning.hide()
         self.activity_combo.blockSignals(True)
         self.activity_combo.clear()
-        model_names = (
-            [model.value for model in ActivityModel]
-            if len(system.components) == 2
-            else [ActivityModel.WILSON.value]
-        )
+        if any(model in EOS_MODEL_NAMES for model in system.available_models):
+            model_names = list(system.available_models)
+        elif len(system.components) == 2:
+            model_names = [ActivityModel.WILSON.value, ActivityModel.MARGULES.value, ActivityModel.VAN_LAAR.value]
+        else:
+            model_names = [ActivityModel.WILSON.value]
         for model_name in model_names:
             model = ActivityModel(model_name)
             self.activity_combo.addItem(model.value, model.name)
@@ -315,6 +362,12 @@ class CalculationPage(QWidget):
         self._populate_composition()
         self.vle_table.setRowCount(0)
         self._update_vle_hint()
+        calculation = CalculationType[self.calculation_combo.currentData()]
+        if calculation.fixed_variable == "temperatura":
+            if system.id == "methane_n_butane_1402":
+                self.fixed_value.setValue(37.780)
+            elif system.id == "nitrogen_methane_1401":
+                self.fixed_value.setValue(-73.150)
 
     def _populate_component_table(self) -> None:
         system = self._current_system()
@@ -332,16 +385,23 @@ class CalculationPage(QWidget):
                 self.component_table.setItem(row, column, item)
 
     def _populate_composition(self) -> None:
-        components = self._current_system().components
+        system = self._current_system()
+        components = system.components
         self.composition_table.blockSignals(True)
         self.composition_table.setRowCount(len(components))
-        equal = 1.0 / len(components) if components else 0.0
+        if system.id == "methane_n_butane_1402":
+            defaults = (0.10, 0.90)
+        elif system.id == "nitrogen_methane_1401":
+            defaults = (0.40, 0.60)
+        else:
+            equal = 1.0 / len(components) if components else 0.0
+            defaults = tuple(equal for _ in components)
         for row, component in enumerate(components):
             name = QTableWidgetItem(component.name)
             name.setFlags(name.flags() & ~Qt.ItemFlag.ItemIsEditable)
             formula = QTableWidgetItem(component.formula)
             formula.setFlags(formula.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            fraction = QTableWidgetItem(f"{equal:.6f}")
+            fraction = QTableWidgetItem(f"{defaults[row]:.6f}")
             fraction.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.composition_table.setItem(row, 0, name)
             self.composition_table.setItem(row, 1, formula)
@@ -362,6 +422,12 @@ class CalculationPage(QWidget):
     def _update_vle_hint(self) -> None:
         system = self._current_system()
         model = ActivityModel[self.activity_combo.currentData()]
+        if model in {ActivityModel.REDLICH_KWONG, ActivityModel.SOAVE_REDLICH_KWONG}:
+            self.vle_hint.setText(
+                "Modo EOS cúbica / phi-phi: no se requieren datos VLE de ajuste ni parámetros de actividad. "
+                "El equilibrio se resuelve con coeficientes de fugacidad calculados por la EOS."
+            )
+            return
         if self._has_required_parameters(system, model):
             self.vle_hint.setText(
                 f"{system.name} ya contiene parámetros {model.value} documentados. "
@@ -391,6 +457,14 @@ class CalculationPage(QWidget):
         source: str = "Usuario",
         pair_key: str | None = None,
     ) -> None:
+        model = ActivityModel[self.activity_combo.currentData()]
+        if model in {ActivityModel.REDLICH_KWONG, ActivityModel.SOAVE_REDLICH_KWONG}:
+            QMessageBox.information(
+                self,
+                "Datos VLE no requeridos",
+                "Este sistema usa EOS cúbica phi-phi y no necesita puntos VLE para ajustar Wilson/Margules/Van Laar.",
+            )
+            return
         row = self.vle_table.rowCount()
         self.vle_table.insertRow(row)
         pair_keys = self._pair_keys()
@@ -451,6 +525,9 @@ class CalculationPage(QWidget):
                 )
 
     def _vle_fit_data(self) -> dict[str, list[dict[str, object]]]:
+        model = ActivityModel[self.activity_combo.currentData()]
+        if model in {ActivityModel.REDLICH_KWONG, ActivityModel.SOAVE_REDLICH_KWONG}:
+            return {}
         if self.vle_table.rowCount() == 0:
             return {}
         required_pairs = set(self._pair_keys())
@@ -503,6 +580,8 @@ class CalculationPage(QWidget):
 
     @staticmethod
     def _has_required_parameters(system, model: ActivityModel) -> bool:
+        if model in {ActivityModel.REDLICH_KWONG, ActivityModel.SOAVE_REDLICH_KWONG}:
+            return True
         parameters = system.binary_parameters.get(model.value, {})
         pairs = parameters.get("pairs", {}) if isinstance(parameters, dict) else {}
         if not isinstance(pairs, dict):
@@ -699,7 +778,13 @@ class ResultsPage(QWidget):
             self._draw_empty_diagram()
             self.diagram_ready.emit(None)
             return
-        self.diagram_message.hide()
+        if str(self.current_diagram.get("diagram_type", [""])[0]) == "Fugacidad RK":
+            self.diagram_message.setText(
+                "Gráfico de fugacidad vapor RK; este caso no corresponde a un diagrama Pxy/Txy."
+            )
+            self.diagram_message.show()
+        else:
+            self.diagram_message.hide()
         draw_phase_curve(self.figure, self.current_diagram)
         self.canvas.draw()
         self.diagram_ready.emit(self.current_diagram)
@@ -843,11 +928,12 @@ class ValidationsPage(QWidget):
         layout = QVBoxLayout(self)
         layout.addLayout(page_header("Validaciones", "Matriz prevista para evidencias científicas y numéricas."))
         layout.addWidget(warning_banner())
-        table = QTableWidget(4, 5)
+        table = QTableWidget(5, 5)
         table.setHorizontalHeaderLabels(["Caso", "Propósito", "Estado BETA", "Criterio final", "Evidencia"])
         rows = [
             ("Wilson 14.54", "Sistemas binarios documentados", "Calculable", "Convergencia y curvas Pxy/Txy", "Suite pytest"),
             ("Ciclohexano / n-Heptano", "Límite casi ideal", "Calculable", "Temperatura física", "Caso regresión"),
+            ("Metano / n-Butano 14.2", "Reproducir ejemplo capítulo 14", "Calculable EOS", "Pxy SRK a 100 °F", "Validación principal"),
             ("Margules / Van Laar", "Ajuste desde VLE", "Limitado por datos", "Solo si hay x/y/P/T", "Base JSON"),
             ("Datos faltantes", "Política científica", "Bloqueo amigable", "No inventar parámetros", "Validación"),
         ]

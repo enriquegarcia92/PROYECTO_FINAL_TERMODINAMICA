@@ -276,3 +276,57 @@ def test_phase_curve_for_result_generates_txy_for_pressure_fixed_calculation() -
 
     assert data["diagram_type"][0] == "Txy"
     assert data["point_value"][0] == pytest.approx(result.temperature_k)
+
+
+def test_methane_n_butane_srk_bubl_p_and_diagram() -> None:
+    service = ThermodynamicVLEService(DataRepository())
+    result = service.calculate(
+        CalculationRequest(
+            CalculationType.BUBL_P,
+            "methane_n_butane_1402",
+            ActivityModel.SOAVE_REDLICH_KWONG,
+            VaporModel.COMPARE,
+            310.93,
+            (0.1, 0.9),
+        )
+    )
+
+    assert result.converged
+    assert result.pressure_kpa > 0
+    assert result.vapor_model == "EOS cúbica phi-phi"
+    assert "Ejemplo 14.2" in " ".join(result.warnings)
+    assert abs(sum(result.y) - 1.0) < 1e-6
+
+    diagram = service.phase_curve_for_result(result)
+    assert diagram["diagram_type"][0] == "Pxy"
+    assert len(diagram["x"]) == 21
+
+
+def test_nitrogen_methane_rk_fugacity_case_generates_fugacity_diagram() -> None:
+    service = ThermodynamicVLEService(DataRepository())
+    result = service.calculate(
+        CalculationRequest(
+            CalculationType.BUBL_P,
+            "nitrogen_methane_1401",
+            ActivityModel.REDLICH_KWONG,
+            VaporModel.COMPARE,
+            200.0,
+            (0.4, 0.6),
+        )
+    )
+
+    assert result.calculation_type == "Fugacidad vapor RK"
+    assert result.pressure_kpa == 3000.0
+    assert all(value > 0 for value in result.phi)
+    assert "Z_vapor" in result.residuals
+    diagram = service.phase_curve_for_result(result)
+    assert diagram["diagram_type"][0] == "Fugacidad RK"
+    assert len(diagram["x"]) == 21
+    assert len(diagram["phi_first"]) == 21
+    assert len(diagram["phi_second"]) == 21
+    assert len(diagram["z"]) == 21
+    assert diagram["point_x"][0] == pytest.approx(0.4)
+    assert diagram["point_z"][0] == pytest.approx(result.residuals["Z_vapor"])
+    assert all(value > 0 for value in diagram["phi_first"])
+    assert all(value > 0 for value in diagram["phi_second"])
+    assert all(value > 0 for value in diagram["z"])

@@ -34,6 +34,36 @@
       }
     },
     {
+      "id": "methane",
+      "name": "Metano",
+      "formula": "CH4",
+      "tc_k": 190.6,
+      "pc_kpa": 4599.0,
+      "omega": 0.012,
+      "liquid_molar_volume_m3_mol": null,
+      "antoine": null
+    },
+    {
+      "id": "n_butane",
+      "name": "n-Butano",
+      "formula": "C4H10",
+      "tc_k": 425.1,
+      "pc_kpa": 3796.0,
+      "omega": 0.2,
+      "liquid_molar_volume_m3_mol": null,
+      "antoine": null
+    },
+    {
+      "id": "nitrogen",
+      "name": "Nitrógeno",
+      "formula": "N2",
+      "tc_k": 126.2,
+      "pc_kpa": 3390.0,
+      "omega": 0.04,
+      "liquid_molar_volume_m3_mol": null,
+      "antoine": null
+    },
+    {
       "id": "n_heptane",
       "name": "n-Heptano",
       "formula": "C7H16",
@@ -664,6 +694,32 @@
       ],
       "available_models": [
         "Wilson"
+      ]
+    },
+    {
+      "id": "methane_n_butane_1402",
+      "name": "Metano / n-Butano",
+      "description": "Ejemplo 14.2: diagrama P-x-y a 100 °F para metano(1)/n-butano(2), resuelto con Soave/Redlich-Kwong phi-phi.",
+      "kind": "EOS cúbica phi-phi — SRK Ejemplo 14.2",
+      "component_ids": [
+        "methane",
+        "n_butane"
+      ],
+      "available_models": [
+        "Soave-Redlich-Kwong"
+      ]
+    },
+    {
+      "id": "nitrogen_methane_1401",
+      "name": "Nitrógeno / Metano",
+      "description": "Ejemplo 14.1: coeficientes de fugacidad de vapor para N2(1)/CH4(2) a 200 K y 30 bar con Redlich-Kwong.",
+      "kind": "EOS cúbica phi-phi — RK Ejemplo 14.1",
+      "component_ids": [
+        "nitrogen",
+        "methane"
+      ],
+      "available_models": [
+        "Redlich-Kwong"
       ]
     }
   ]

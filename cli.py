@@ -7,6 +7,10 @@ from vle_poc.units import celsius_to_kelvin, kelvin_to_celsius
 from vle_poc.validation import InputValidationError
 
 
+EOS_MODELS = {ActivityModel.REDLICH_KWONG, ActivityModel.SOAVE_REDLICH_KWONG}
+EOS_MODEL_NAMES = {model.value for model in EOS_MODELS}
+
+
 def choose(title: str, options: list[tuple[str, object]]) -> object:
     print(f"\n{title}")
     for index, (label, _) in enumerate(options, 1):
@@ -53,6 +57,8 @@ def read_vle_fit_data(system) -> dict[str, list[dict[str, object]]]:
 
 
 def has_required_parameters(system, model: ActivityModel) -> bool:
+    if model in EOS_MODELS:
+        return True
     parameters = system.binary_parameters.get(model.value, {})
     pairs = parameters.get("pairs", {}) if isinstance(parameters, dict) else {}
     if not isinstance(pairs, dict):
@@ -78,11 +84,16 @@ def main() -> int:
         system = choose("Sistema documentado", [(item.name, item) for item in repository.all_systems()])
         if system.id == VLLE_1427_SYSTEM_ID:
             print(f"\nAdvertencia 14.27: {VLLE_1427_WARNING}")
-        available_models = (
-            [ActivityModel.WILSON, ActivityModel.MARGULES, ActivityModel.VAN_LAAR]
-            if len(system.components) == 2
-            else [ActivityModel.WILSON]
-        )
+        if any(model in EOS_MODEL_NAMES for model in system.available_models):
+            print(
+                "\nModo EOS cúbica phi-phi: este sistema no usa Wilson/Margules/Van Laar "
+                "ni requiere datos VLE de ajuste."
+            )
+            available_models = [ActivityModel(model) for model in system.available_models]
+        elif len(system.components) == 2:
+            available_models = [ActivityModel.WILSON, ActivityModel.MARGULES, ActivityModel.VAN_LAAR]
+        else:
+            available_models = [ActivityModel.WILSON]
         activity = choose(
             "Modelo de actividad",
             [(model.value, model) for model in available_models],

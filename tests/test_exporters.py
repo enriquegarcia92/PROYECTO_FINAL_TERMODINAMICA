@@ -83,3 +83,47 @@ def test_problem_1427_warning_is_exported_to_txt() -> None:
 
     assert VLLE_1427_WARNING in text
     assert "water|n_pentane" in text
+
+
+def test_eos_chapter_14_validation_is_exported_to_txt() -> None:
+    service = ThermodynamicVLEService(DataRepository())
+    result = service.calculate(
+        CalculationRequest(
+            CalculationType.BUBL_P,
+            "methane_n_butane_1402",
+            ActivityModel.SOAVE_REDLICH_KWONG,
+            VaporModel.COMPARE,
+            310.93,
+            (0.1, 0.9),
+        )
+    )
+
+    text = format_result_txt(result)
+
+    assert "Validacion capitulo 14" in text
+    assert "Ejemplo 14.2 - Metano / n-Butano" in text
+    assert "Soave-Redlich-Kwong phi-phi" in text
+    assert "EOS cúbica phi-phi" in text
+
+
+def test_nitrogen_methane_txt_reports_z_from_rk_cubic_when_table_is_missing() -> None:
+    service = ThermodynamicVLEService(DataRepository())
+    result = service.calculate(
+        CalculationRequest(
+            CalculationType.BUBL_P,
+            "nitrogen_methane_1401",
+            ActivityModel.REDLICH_KWONG,
+            VaporModel.COMPARE,
+            200.0,
+            (0.4, 0.6),
+        )
+    )
+
+    text = format_result_txt(result)
+
+    assert "Ejemplo 14.1 - Nitrógeno / Metano" in text
+    assert "Z calculado mediante ecuacion cubica Redlich-Kwong" in text
+    assert "referencia tabulada no disponible" in text
+    assert "Z_vapor" in text
+    assert "phi_Nitrógeno" in text
+    assert "phi_Metano" in text

@@ -48,7 +48,12 @@ def validate_request(request: CalculationRequest, system: SystemDefinition) -> C
             raise InputValidationError("Presión debe ser un número positivo y finito.")
         if request.fixed_value > 10_000:
             raise InputValidationError("La presión excede el límite de 10 000 kPa de esta BETA.")
-    if request.activity_model.value not in system.available_models and not request.user_vle_fit_data:
+    eos_models = {ActivityModel.REDLICH_KWONG, ActivityModel.SOAVE_REDLICH_KWONG}
+    if (
+        request.activity_model.value not in system.available_models
+        and not request.user_vle_fit_data
+        and request.activity_model not in eos_models
+    ):
         raise InputValidationError(
             f"El modelo {request.activity_model.value} no está disponible para {system.name}."
         )

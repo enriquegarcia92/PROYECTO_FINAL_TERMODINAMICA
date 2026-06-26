@@ -97,6 +97,33 @@ def format_result_txt(result: CalculationResult) -> str:
         for name, value in zip(result.component_names, result.k_values):
             lines.append(f"{name}: {value:.6f}")
 
+    if "Redlich-Kwong" in result.activity_model or "EOS cúbica" in result.vapor_model:
+        lines.extend(["", "Validacion capitulo 14", "-" * 26])
+        if "n-Butano" in result.system_name or "Metano / n-Butano" in result.system_name:
+            lines.extend(
+                [
+                    "Caso: Ejemplo 14.2 - Metano / n-Butano.",
+                    "Modelo: Soave-Redlich-Kwong phi-phi.",
+                    "Referencia: diagrama P-x-y a 100 °F del capitulo 14.",
+                    "Nota: si no se carga tabla experimental digitalizada, la validacion es cualitativa contra la referencia del libro.",
+                ]
+            )
+        elif "Nitrógeno" in result.system_name or "Nitrogeno" in result.system_name:
+            lines.extend(
+                [
+                    "Caso: Ejemplo 14.1 - Nitrógeno / Metano.",
+                    "Modelo: Redlich-Kwong para coeficientes de fugacidad en fase vapor.",
+                    "Nota: este caso valida fugacidad vapor; no es un diagrama VLE gamma-phi.",
+                    "Z cuantifica la desviacion respecto al gas ideal: Z=1 ideal, Z≠1 comportamiento real.",
+                    "Z calculado mediante ecuacion cubica Redlich-Kwong; referencia tabulada no disponible en la base actual.",
+                ]
+            )
+            for name, value in zip(result.component_names, result.phi):
+                lines.append(f"phi_{name}: {value:.6f}")
+        for key, value in result.residuals.items():
+            if "validacion" in key.lower() or key == "Z_vapor":
+                lines.append(f"{key}: {value:.6e}")
+
     if result.data_sources:
         lines.extend(["", "Fuentes de datos", "-" * 20])
         lines.extend(f"- {source}" for source in result.data_sources)

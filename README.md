@@ -14,6 +14,7 @@ Esta documentación está escrita para Windows. Aunque el código pueda ejecutar
 - Flujos BUBL P, DEW P, BUBL T y DEW T con motor termodinámico real.
 - Antoine con convención `ln(Psat[kPa]) = A - B/(T[°C] + C)`.
 - Corrección gamma-phi con Pitzer/virial, `phi_i`, `phi_i_sat` y Poynting.
+- Modo separado EOS cúbica / phi-phi para gases ligeros del capítulo 14.
 - Selector de sistemas fijos documentados; no permite combinaciones custom.
 - Entrada de datos VLE `x/y/P/T` por usuario para ajustar Wilson, Margules y Van Laar cuando aplique.
 - Ejemplos VLE precargados para algunos sistemas; se cargan explícitamente desde la interfaz si el usuario desea usarlos.
@@ -53,6 +54,13 @@ Sistemas ternarios Wilson documentados:
 
 - Acetona / Metanol / Agua, problemas 12.20 y 12.22, con parámetros energéticos Wilson de la Tabla 12.5.
 
+Sistemas EOS cúbica / phi-phi del capítulo 14:
+
+- Metano / n-Butano, Ejemplo 14.2, resuelto con Soave-Redlich-Kwong para reproducir el diagrama P-x-y a `100 °F = 310.93 K`.
+- Nitrógeno / Metano, Ejemplo 14.1, resuelto con Redlich-Kwong para coeficientes de fugacidad en vapor y factor de compresibilidad `Z`.
+
+Estos sistemas no usan Wilson, Margules, Van Laar, Antoine ni datos VLE de ajuste de usuario. Se separan del motor gamma-phi porque metano y nitrógeno son gases ligeros/criogénicos y pueden estar por encima de su temperatura crítica; forzarlos al enfoque Antoine + gamma sería científicamente falso.
+
 Sistema especial del problema 14.27:
 
 - Agua / n-Pentano / n-Heptano aparece únicamente con Wilson. Este problema describe dos fases líquidas inmiscibles; el método físicamente recomendado por el enunciado es fase vapor ideal + agua como fase líquida separada + ley de Raoult ideal para la fase hidrocarburo. Wilson se habilita solo por requerimiento del proyecto y no debe interpretarse como el modelo correcto para LLE/VLLE.
@@ -64,6 +72,8 @@ Reglas actuales:
 - Wilson multicomponente requiere datos VLE binarios para todos los pares del sistema. En Agua / n-Pentano / n-Heptano se necesitan puntos para `water|n_pentane`, `water|n_heptane` y `n_pentane|n_heptane` si no existen parámetros bibliográficos cargados.
 - Los datos VLE ingresados por el usuario se usan solo en la corrida actual y no modifican `base_datos_VLE.json`.
 - Los diagramas se generan automáticamente como Pxy/Txy para sistemas binarios y como corte composicional equivalente para sistemas ternarios.
+- En Metano / n-Butano el diagrama automático es P-x-y SRK a la temperatura ingresada; para reproducir el Ejemplo 14.2 use `37.78 °C` (`100 °F`).
+- En Nitrógeno / Metano el gráfico automático no es Pxy/Txy: muestra `φ_N2`, `φ_CH4` y `Z` contra composición de vapor. Si no hay valor tabulado de `Z` en la base, el programa lo calcula resolviendo la cúbica Redlich-Kwong `Z^3 - Z^2 + (A-B-B^2)Z - AB = 0`.
 - Si faltan Antoine, propiedades críticas, volumen líquido o parámetros binarios, el cálculo se bloquea con un mensaje amigable. El programa no inventa datos.
 
 ## Parámetros Wilson

@@ -26,6 +26,8 @@ class ActivityModel(str, Enum):
     WILSON = "Wilson"
     MARGULES = "Margules"
     VAN_LAAR = "Van Laar"
+    REDLICH_KWONG = "Redlich-Kwong"
+    SOAVE_REDLICH_KWONG = "Soave-Redlich-Kwong"
 
 
 class VaporModel(str, Enum):

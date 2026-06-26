@@ -8,6 +8,7 @@ import numpy as np
 from scipy.optimize import brentq
 
 from .activity import activity_coefficients
+from .cubic_eos import bubble_pressure_phi_phi, vapor_fugacity_result
 from .domain import ActivityModel, CalculationRequest, CalculationResult, CalculationType, SystemDefinition, VaporModel
 from .fugacity import phi_mixture, phi_sat_pitzer, poynting_factor
 from .parameter_fitter import ActivityParameterFitter
@@ -24,6 +25,13 @@ VLLE_1427_WARNING = (
     "+ agua como fase líquida separada. Wilson se habilita solo por requerimiento "
     "del proyecto y no representa correctamente LLE/VLLE."
 )
+EOS_WARNING = (
+    "Este sistema se resuelve con EOS cúbica phi-phi. "
+    "No usa Wilson/Margules/Van Laar porque contiene gases ligeros/criogénicos."
+)
+EOS_MODELS = {ActivityModel.REDLICH_KWONG, ActivityModel.SOAVE_REDLICH_KWONG}
+METHANE_N_BUTANE_SYSTEM_ID = "methane_n_butane_1402"
+NITROGEN_METHANE_SYSTEM_ID = "nitrogen_methane_1401"
 
 
 class ThermodynamicVLEService:
@@ -50,12 +58,15 @@ class ThermodynamicVLEService:
         request: CalculationRequest,
         system: SystemDefinition,
     ) -> SystemDefinition:
+        if request.activity_model in EOS_MODELS:
+            self._parameter_warnings = ()
+            return system
         user_supplied_fit_data = bool(request.user_vle_fit_data)
         if (
             not user_supplied_fit_data
             and request.activity_model is ActivityModel.WILSON
             and self._has_required_parameters(
-            system, request.activity_model
+                system, request.activity_model
             )
         ):
             self._parameter_warnings = ()
@@ -79,7 +90,7 @@ class ThermodynamicVLEService:
                 warnings.append(
                     "Los parámetros se calcularon en memoria, pero no se pudieron guardar en la base JSON: "
                     f"{exc}"
-            )
+                )
         self._parameter_warnings = tuple(warnings)
         return replace(system, binary_parameters=parameters)
 
@@ -109,6 +120,8 @@ class ThermodynamicVLEService:
     def calculate(self, request: CalculationRequest) -> CalculationResult:
         system = self._base_system(request)
         request = validate_request(request, system)
+        if request.activity_model in EOS_MODELS:
+            return self._eos_calculate(request, system)
         previous_system = self._active_system
         previous_warnings = self._parameter_warnings
         self._parameter_warnings = ()
@@ -126,6 +139,105 @@ class ThermodynamicVLEService:
         finally:
             self._active_system = previous_system
             self._parameter_warnings = previous_warnings
+
+    def _eos_calculate(self, request: CalculationRequest, system: SystemDefinition) -> CalculationResult:
+        if request.activity_model is ActivityModel.SOAVE_REDLICH_KWONG:
+            if request.calculation_type is not CalculationType.BUBL_P:
+                raise InputValidationError("Metano/n-Butano con SRK está implementado como BUBL P a temperatura fija.")
+            eos_result = bubble_pressure_phi_phi(
+                system,
+                request.fixed_value,
+                request.composition,
+                ActivityModel.SOAVE_REDLICH_KWONG,
+                tolerance=request.tolerance,
+                max_iterations=request.max_iterations,
+            )
+            x = tuple(float(value) for value in request.composition)
+            residual = eos_result.residual
+            sources = tuple(
+                sorted(
+                    {
+                        "Smith, Van Ness & Abbott, Ejemplo 14.2; SRK phi-phi para metano/n-butano a 100 °F.",
+                        *(system.description, system.kind),
+                    }
+                )
+            )
+            result = CalculationResult(
+                calculation_type=request.calculation_type.value,
+                system_name=system.name,
+                component_names=tuple(component.name for component in system.components),
+                temperature_k=float(request.fixed_value),
+                pressure_kpa=float(eos_result.pressure_kpa),
+                x=x,
+                y=eos_result.y,
+                gamma=tuple(1.0 for _ in system.components),
+                phi=eos_result.phi_vapor,
+                phi_sat=eos_result.phi_liquid,
+                poynting=tuple(1.0 for _ in system.components),
+                iterations=eos_result.iterations,
+                converged=residual <= max(request.tolerance, 1e-6),
+                residuals={
+                    "sum_Kx_minus_1": float(residual),
+                    "suma_x": float(abs(sum(x) - 1.0)),
+                    "suma_y": float(abs(sum(eos_result.y) - 1.0)),
+                    "validacion_capitulo_14_error_referencia": float("nan"),
+                },
+                warnings=(
+                    EOS_WARNING,
+                    "Validación capítulo 14: Ejemplo 14.2. Sin tabla experimental digitalizada; se reproduce el método SRK phi-phi y el diagrama P-x-y.",
+                ),
+                message="Cálculo EOS cúbica phi-phi completado para BUBL P.",
+                activity_model=request.activity_model.value,
+                vapor_model="EOS cúbica phi-phi",
+                simulated=False,
+                history=({"iteration": float(eos_result.iterations), "residual": float(residual), "value": float(eos_result.pressure_kpa)},),
+                psat_kpa=(),
+                k_values=eos_result.k_values,
+                data_sources=sources,
+            )
+            result.assert_shape()
+            return result
+        if request.activity_model is ActivityModel.REDLICH_KWONG:
+            if request.system_id != NITROGEN_METHANE_SYSTEM_ID:
+                raise InputValidationError("Redlich-Kwong está habilitado solo para Nitrógeno/Metano en esta BETA.")
+            state = vapor_fugacity_result(
+                system,
+                request.fixed_value if request.calculation_type.fixed_variable == "temperatura" else 200.0,
+                request.fixed_value if request.calculation_type.fixed_variable == "presión" else 3000.0,
+                request.composition,
+                ActivityModel.REDLICH_KWONG,
+            )
+            temperature_k = request.fixed_value if request.calculation_type.fixed_variable == "temperatura" else 200.0
+            pressure_kpa = request.fixed_value if request.calculation_type.fixed_variable == "presión" else 3000.0
+            z = tuple(float(value) for value in request.composition)
+            result = CalculationResult(
+                calculation_type="Fugacidad vapor RK",
+                system_name=system.name,
+                component_names=tuple(component.name for component in system.components),
+                temperature_k=float(temperature_k),
+                pressure_kpa=float(pressure_kpa),
+                x=z,
+                y=z,
+                gamma=tuple(1.0 for _ in system.components),
+                phi=state.phi,
+                phi_sat=tuple(1.0 for _ in system.components),
+                poynting=tuple(1.0 for _ in system.components),
+                iterations=1,
+                converged=True,
+                residuals={"Z_vapor": float(state.z), "suma_y": float(abs(sum(z) - 1.0))},
+                warnings=(EOS_WARNING, "Ejemplo 14.1: validación secundaria de coeficientes de fugacidad vapor, no diagrama VLE."),
+                message="Cálculo Redlich-Kwong de coeficientes de fugacidad de vapor completado.",
+                activity_model=request.activity_model.value,
+                vapor_model="EOS cúbica phi-phi",
+                simulated=False,
+                history=({"iteration": 1.0, "residual": 0.0, "value": float(state.z)},),
+                psat_kpa=(),
+                k_values=(),
+                data_sources=("Smith, Van Ness & Abbott, Ejemplo 14.1; Redlich-Kwong para N2/CH4.", system.description),
+            )
+            result.assert_shape()
+            return result
+        raise InputValidationError(f"Modelo EOS no soportado: {request.activity_model.value}.")
 
     def _gamma(self, request: CalculationRequest, x: np.ndarray, temperature_k: float) -> np.ndarray:
         system = self._system(request)
@@ -450,10 +562,12 @@ class ThermodynamicVLEService:
         component_ids = self._component_ids_from_result(result)
         if len(component_ids) < 2:
             raise InputValidationError("El diagrama requiere al menos dos componentes.")
+        activity_model = ActivityModel(result.activity_model)
+        if activity_model is ActivityModel.REDLICH_KWONG:
+            return self._rk_fugacity_curve_for_result(result, component_ids)
         diagram_type = "Pxy" if result.calculation_type in {CalculationType.BUBL_P.value, CalculationType.DEW_P.value} else "Txy"
         fixed_value = result.temperature_k if diagram_type == "Pxy" else result.pressure_kpa
-        activity_model = ActivityModel(result.activity_model)
-        vapor_model = VaporModel(result.vapor_model)
+        vapor_model = VaporModel.COMPARE if activity_model in EOS_MODELS else VaporModel(result.vapor_model)
         known_composition = result.x if result.calculation_type in {CalculationType.BUBL_P.value, CalculationType.BUBL_T.value} else result.y
         main_name = result.component_names[0]
         xs = np.linspace(0.01, 0.99, 21)
@@ -473,7 +587,12 @@ class ThermodynamicVLEService:
                 component_ids=component_ids,
                 user_vle_fit_data=self._fit_data_from_result(result),
             )
-            curve_result = self.calculate(request)
+            try:
+                curve_result = self.calculate(request)
+            except InputValidationError:
+                liquid_values.append(float("nan"))
+                vapor_axis.append(float("nan"))
+                continue
             liquid_values.append(curve_result.pressure_kpa if diagram_type == "Pxy" else curve_result.temperature_k)
             vapor_axis.append(curve_result.y[0])
         if diagram_type == "Pxy":
@@ -502,6 +621,55 @@ class ThermodynamicVLEService:
             "point_value": np.asarray([point_value]),
             "diagram_type": np.asarray([diagram_type]),
             "is_cut": np.asarray([1 if len(component_ids) > 2 else 0]),
+        }
+
+    def _rk_fugacity_curve_for_result(
+        self,
+        result: CalculationResult,
+        component_ids: tuple[str, ...],
+    ) -> dict[str, np.ndarray]:
+        system = self.repository.build_system(component_ids, available_models=(ActivityModel.REDLICH_KWONG.value,))
+        if len(system.components) != 2:
+            raise InputValidationError("El gráfico de fugacidad RK está implementado para Nitrógeno/Metano binario.")
+        y1_values = np.linspace(0.01, 0.99, 21)
+        phi_first: list[float] = []
+        phi_second: list[float] = []
+        z_values: list[float] = []
+        for y1 in y1_values:
+            state = vapor_fugacity_result(
+                system,
+                result.temperature_k,
+                result.pressure_kpa,
+                (float(y1), float(1.0 - y1)),
+                ActivityModel.REDLICH_KWONG,
+            )
+            phi_first.append(float(state.phi[0]))
+            phi_second.append(float(state.phi[1]))
+            z_values.append(float(state.z))
+        point_y = float(result.y[0])
+        return {
+            "x": y1_values,
+            "phi_first": np.asarray(phi_first),
+            "phi_second": np.asarray(phi_second),
+            "z": np.asarray(z_values),
+            "ylabel": np.asarray(["Coeficiente de fugacidad φ"]),
+            "zlabel": np.asarray(["Factor de compresibilidad Z"]),
+            "title": np.asarray(
+                [
+                    "Fugacidad RK — "
+                    f"{result.system_name} — T = {result.temperature_k:.3f} K, "
+                    f"P = {result.pressure_kpa:.3f} kPa"
+                ]
+            ),
+            "xlabel": np.asarray([f"Fracción molar de {result.component_names[0]} en vapor"]),
+            "point_x": np.asarray([point_y]),
+            "point_phi_first": np.asarray([float(result.phi[0])]),
+            "point_phi_second": np.asarray([float(result.phi[1])]),
+            "point_z": np.asarray([float(result.residuals.get("Z_vapor", float("nan")))]),
+            "component_first": np.asarray([result.component_names[0]]),
+            "component_second": np.asarray([result.component_names[1]]),
+            "diagram_type": np.asarray(["Fugacidad RK"]),
+            "is_cut": np.asarray([0]),
         }
 
     @staticmethod

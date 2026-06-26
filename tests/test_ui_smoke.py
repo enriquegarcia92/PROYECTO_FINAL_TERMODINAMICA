@@ -101,6 +101,32 @@ def test_acetone_methanol_water_ui_runs_without_vle_rows_or_warning() -> None:
     app.processEvents()
 
 
+def test_eos_systems_show_only_their_eos_model_and_skip_vle_data() -> None:
+    app = create_application()
+    window = MainWindow()
+
+    window.calculation_page.system_combo.setCurrentIndex(
+        window.calculation_page.system_combo.findData("methane_n_butane_1402")
+    )
+    assert window.calculation_page.activity_combo.count() == 1
+    assert window.calculation_page.activity_combo.itemText(0) == "Soave-Redlich-Kwong"
+    assert "EOS cúbica" in window.calculation_page.system_warning.text()
+    assert "no se requieren datos VLE" in window.calculation_page.vle_hint.text()
+
+    window.calculation_page.system_combo.setCurrentIndex(
+        window.calculation_page.system_combo.findData("nitrogen_methane_1401")
+    )
+    assert window.calculation_page.activity_combo.count() == 1
+    assert window.calculation_page.activity_combo.itemText(0) == "Redlich-Kwong"
+    window.calculation_page._run()
+    assert window.results_page.current_diagram is not None
+    assert window.results_page.current_diagram["diagram_type"][0] == "Fugacidad RK"
+    assert "no corresponde a un diagrama Pxy/Txy" in window.results_page.diagram_message.text()
+
+    window.close()
+    app.processEvents()
+
+
 def test_diagram_page_has_no_generate_button() -> None:
     app = create_application()
     window = MainWindow()
