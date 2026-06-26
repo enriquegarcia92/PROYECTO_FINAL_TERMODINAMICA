@@ -1,4 +1,4 @@
-"""Interfaz PySide6 completa de la POC."""
+"""Interfaz PySide6 de la BETA termodinámica VLE."""
 
 from __future__ import annotations
 
@@ -40,10 +40,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .domain import MAX_COMPONENTS, ActivityModel, CalculationRequest, CalculationResult, CalculationType, VaporModel
+from .domain import ActivityModel, CalculationRequest, CalculationResult, CalculationType, VaporModel
 from .exporters import format_result_txt
 from .repository import DataRepository
-from .service import SIMULATION_WARNING, ThermodynamicVLEService
+from .service import SIMULATION_WARNING, VLLE_1427_SYSTEM_ID, VLLE_1427_WARNING, ThermodynamicVLEService
 from .styles import APP_STYLE
 from .units import celsius_to_kelvin, kelvin_to_celsius
 from .validation import InputValidationError
@@ -115,22 +115,22 @@ class HomePage(QWidget):
     def __init__(self, repository: DataRepository) -> None:
         super().__init__()
         layout = QVBoxLayout(self)
-        layout.addLayout(page_header("VLE Gamma-Phi", "Prueba de concepto para diseñar y validar la aplicación final."))
+        layout.addLayout(page_header("VLE Gamma-Phi", "BETA termodinámica para sistemas documentados disponibles."))
         layout.addWidget(warning_banner())
         metrics = QHBoxLayout()
         metrics.addWidget(card("Cálculos previstos", "4"))
-        metrics.addWidget(card("Sistemas demo", str(len(repository.all_systems()))))
+        metrics.addWidget(card("Sistemas disponibles", str(len(repository.all_systems()))))
         metrics.addWidget(card("Modelos gamma", "3"))
         layout.addLayout(metrics)
 
         intro = QFrame()
         intro.setObjectName("card")
         intro_layout = QVBoxLayout(intro)
-        heading = QLabel("Un flujo completo antes de construir el solver")
+        heading = QLabel("Cálculos reales sobre sistemas documentados")
         heading.setStyleSheet("font-size: 18px; font-weight: 700;")
         body = QLabel(
-            "Esta POC valida selección de sistema, composición, modelo, presentación de resultados, "
-            "comparación con phi = 1 y diagramas Pxy/Txy. Los cálculos corren solo con datos documentados."
+            "Esta BETA permite elegir sistemas validados en la base, resolver los cuatro cálculos VLE, "
+            "comparar con phi = 1 y generar diagramas Pxy/Txy automáticos."
         )
         body.setWordWrap(True)
         actions = QHBoxLayout()
@@ -156,7 +156,6 @@ class CalculationPage(QWidget):
         super().__init__()
         self.repository = repository
         self.service = service
-        self.selected_component_ids: list[str] = ["cyclohexane"]
         outer_layout = QVBoxLayout(self)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -165,8 +164,18 @@ class CalculationPage(QWidget):
         container = QWidget()
         scroll.setWidget(container)
         layout = QVBoxLayout(container)
-        layout.addLayout(page_header("Nuevo cálculo", "Configure el flujo VLE que deberá resolver el núcleo termodinámico."))
+        layout.addLayout(
+            page_header(
+                "Nuevo cálculo",
+                "Seleccione uno de los sistemas documentados disponibles en la BETA termodinámica.",
+            )
+        )
         layout.addWidget(warning_banner())
+        self.system_warning = QLabel()
+        self.system_warning.setObjectName("warningBanner")
+        self.system_warning.setWordWrap(True)
+        self.system_warning.hide()
+        layout.addWidget(self.system_warning)
 
         top = QHBoxLayout()
         setup = QGroupBox("Configuración")
@@ -174,15 +183,10 @@ class CalculationPage(QWidget):
         self.calculation_combo = QComboBox()
         for item in CalculationType:
             self.calculation_combo.addItem(item.value, item.name)
-        self.component_combo = QComboBox()
-        for component in repository.all_components():
-            self.component_combo.addItem(f"{component.name} ({component.formula})", component.id)
-        self.add_component_button = QPushButton("Agregar componente")
-        self.add_component_button.setObjectName("secondaryButton")
-        self.add_component_button.clicked.connect(self._add_component)
+        self.system_combo = QComboBox()
+        for system in repository.all_systems():
+            self.system_combo.addItem(system.name, system.id)
         self.activity_combo = QComboBox()
-        for item in ActivityModel:
-            self.activity_combo.addItem(item.value, item.name)
         self.vapor_combo = QComboBox()
         for item in VaporModel:
             self.vapor_combo.addItem(item.value, item.name)
@@ -192,11 +196,10 @@ class CalculationPage(QWidget):
         self.fixed_value.setValue(76.850)
         self.fixed_label = QLabel("Temperatura (°C)")
         setup_form.addRow("Tipo de cálculo", self.calculation_combo)
+        setup_form.addRow("Sistema documentado", self.system_combo)
         setup_form.addRow("Modelo de actividad", self.activity_combo)
         setup_form.addRow("Fase vapor", self.vapor_combo)
         setup_form.addRow(self.fixed_label, self.fixed_value)
-        setup_form.addRow("Sustancia", self.component_combo)
-        setup_form.addRow(self.add_component_button)
         top.addWidget(setup, 1)
 
         numerical = QGroupBox("Control numérico")
@@ -210,16 +213,16 @@ class CalculationPage(QWidget):
         self.iterations.setValue(100)
         numerical_form.addRow("Tolerancia", self.tolerance)
         numerical_form.addRow("Máximo de iteraciones", self.iterations)
-        note = QLabel("Estos controles se conectarán directamente a los solvers reales.")
+        note = QLabel("Estos controles se conectan directamente a los solvers reales de la BETA.")
         note.setWordWrap(True)
         numerical_form.addRow(note)
         top.addWidget(numerical, 1)
         layout.addLayout(top)
 
-        selected_group = QGroupBox(f"Sistema construido (máximo {MAX_COMPONENTS} sustancias)")
+        selected_group = QGroupBox("Sustancias del sistema seleccionado")
         selected_layout = QVBoxLayout(selected_group)
-        self.component_table = QTableWidget(0, 3)
-        self.component_table.setHorizontalHeaderLabels(["Sustancia", "Fórmula", "Acción"])
+        self.component_table = QTableWidget(0, 4)
+        self.component_table.setHorizontalHeaderLabels(["Sustancia", "Fórmula", "Tc (K)", "Pc (kPa)"])
         self.component_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.component_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.component_table.setMinimumHeight(150)
@@ -238,6 +241,34 @@ class CalculationPage(QWidget):
         composition_layout.addWidget(self.composition_table)
         layout.addWidget(composition_group)
 
+        vle_group = QGroupBox("Datos VLE para ajuste del modelo")
+        vle_layout = QVBoxLayout(vle_group)
+        self.vle_hint = QLabel()
+        self.vle_hint.setWordWrap(True)
+        self.vle_table = QTableWidget(0, 6)
+        self.vle_table.setHorizontalHeaderLabels(["Par", "T (°C)", "P (kPa)", "x1", "y1", "Fuente / nota"])
+        self.vle_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.vle_table.setAlternatingRowColors(True)
+        self.vle_table.setMinimumHeight(150)
+        vle_actions = QHBoxLayout()
+        add_vle = QPushButton("Agregar punto VLE")
+        add_vle.setObjectName("secondaryButton")
+        add_vle.clicked.connect(lambda: self._add_vle_row())
+        remove_vle = QPushButton("Quitar punto")
+        remove_vle.setObjectName("secondaryButton")
+        remove_vle.clicked.connect(self._remove_vle_row)
+        load_example = QPushButton("Cargar ejemplo del sistema")
+        load_example.setObjectName("secondaryButton")
+        load_example.clicked.connect(self._load_example_vle)
+        vle_actions.addWidget(add_vle)
+        vle_actions.addWidget(remove_vle)
+        vle_actions.addWidget(load_example)
+        vle_actions.addStretch()
+        vle_layout.addWidget(self.vle_hint)
+        vle_layout.addWidget(self.vle_table)
+        vle_layout.addLayout(vle_actions)
+        layout.addWidget(vle_group)
+
         action_row = QHBoxLayout()
         self.total_label = QLabel()
         action_row.addWidget(self.total_label)
@@ -252,44 +283,56 @@ class CalculationPage(QWidget):
         layout.addLayout(action_row)
 
         self.calculation_combo.currentIndexChanged.connect(self._update_fixed_variable)
+        self.system_combo.currentIndexChanged.connect(self._system_changed)
+        self.activity_combo.currentIndexChanged.connect(self._update_vle_hint)
         self.composition_table.itemChanged.connect(self._update_total)
-        self._populate_component_table()
+        self._system_changed()
         self._populate_composition()
         self._update_fixed_variable()
 
-    def _add_component(self) -> None:
-        component_id = self.component_combo.currentData()
-        if component_id in self.selected_component_ids:
-            QMessageBox.warning(self, "Componente repetido", "Esa sustancia ya forma parte del sistema.")
-            return
-        if len(self.selected_component_ids) >= MAX_COMPONENTS:
-            QMessageBox.warning(self, "Límite alcanzado", f"El máximo permitido es {MAX_COMPONENTS} sustancias.")
-            return
-        self.selected_component_ids.append(component_id)
+    def _current_system(self):
+        return self.repository.get(self.system_combo.currentData())
+
+    def _system_changed(self) -> None:
+        system = self._current_system()
+        if system.id == VLLE_1427_SYSTEM_ID:
+            self.system_warning.setText(VLLE_1427_WARNING)
+            self.system_warning.show()
+        else:
+            self.system_warning.hide()
+        self.activity_combo.blockSignals(True)
+        self.activity_combo.clear()
+        model_names = (
+            [model.value for model in ActivityModel]
+            if len(system.components) == 2
+            else [ActivityModel.WILSON.value]
+        )
+        for model_name in model_names:
+            model = ActivityModel(model_name)
+            self.activity_combo.addItem(model.value, model.name)
+        self.activity_combo.blockSignals(False)
         self._populate_component_table()
         self._populate_composition()
-
-    def _remove_component(self, component_id: str) -> None:
-        if component_id in self.selected_component_ids:
-            self.selected_component_ids.remove(component_id)
-            self._populate_component_table()
-            self._populate_composition()
+        self.vle_table.setRowCount(0)
+        self._update_vle_hint()
 
     def _populate_component_table(self) -> None:
-        self.component_table.setRowCount(len(self.selected_component_ids))
-        for row, component_id in enumerate(self.selected_component_ids):
-            component = self.repository.get_component(component_id)
-            name = QTableWidgetItem(component.name)
-            formula = QTableWidgetItem(component.formula)
-            remove = QPushButton("Quitar")
-            remove.setObjectName("secondaryButton")
-            remove.clicked.connect(lambda checked=False, cid=component_id: self._remove_component(cid))
-            self.component_table.setItem(row, 0, name)
-            self.component_table.setItem(row, 1, formula)
-            self.component_table.setCellWidget(row, 2, remove)
+        system = self._current_system()
+        self.component_table.setRowCount(len(system.components))
+        for row, component in enumerate(system.components):
+            values = (
+                component.name,
+                component.formula,
+                f"{component.tc_k:.2f}",
+                f"{component.pc_kpa:.2f}",
+            )
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self.component_table.setItem(row, column, item)
 
     def _populate_composition(self) -> None:
-        components = tuple(self.repository.get_component(component_id) for component_id in self.selected_component_ids)
+        components = self._current_system().components
         self.composition_table.blockSignals(True)
         self.composition_table.setRowCount(len(components))
         equal = 1.0 / len(components) if components else 0.0
@@ -305,6 +348,174 @@ class CalculationPage(QWidget):
             self.composition_table.setItem(row, 2, fraction)
         self.composition_table.blockSignals(False)
         self._update_total()
+
+    def _pair_keys(self) -> tuple[str, ...]:
+        components = self._current_system().components
+        if len(components) < 2:
+            raise InputValidationError("Se requieren al menos dos componentes para datos VLE.")
+        return tuple(
+            f"{first.id}|{second.id}"
+            for index, first in enumerate(components)
+            for second in components[index + 1 :]
+        )
+
+    def _update_vle_hint(self) -> None:
+        system = self._current_system()
+        model = ActivityModel[self.activity_combo.currentData()]
+        if self._has_required_parameters(system, model):
+            self.vle_hint.setText(
+                f"{system.name} ya contiene parámetros {model.value} documentados. "
+                "Puede ejecutar sin ingresar datos VLE; si agrega puntos, se usarán para ajustar parámetros solo en esta corrida."
+            )
+            return
+        if len(system.components) == 2:
+            first, second = system.components
+            self.vle_hint.setText(
+                f"Ingrese puntos VLE binarios para {first.name} / {second.name}. "
+                "Use x1 e y1 del primer componente; el programa calcula x2=1−x1 y y2=1−y1."
+            )
+        else:
+            pairs = ", ".join(self._pair_keys())
+            self.vle_hint.setText(
+                "Wilson multicomponente requiere datos VLE binarios para todos los pares. "
+                f"Use una fila por par como mínimo: {pairs}. "
+                "En cada fila, x1/y1 corresponden al primer componente escrito en la columna Par."
+            )
+
+    def _add_vle_row(
+        self,
+        temperature_c: float = 76.850,
+        pressure_kpa: float = 101.325,
+        x1: float = 0.5,
+        y1: float = 0.5,
+        source: str = "Usuario",
+        pair_key: str | None = None,
+    ) -> None:
+        row = self.vle_table.rowCount()
+        self.vle_table.insertRow(row)
+        pair_keys = self._pair_keys()
+        selected_pair = pair_key or pair_keys[row % len(pair_keys)]
+        values = (selected_pair, temperature_c, pressure_kpa, x1, y1, source)
+        for column, value in enumerate(values):
+            item = QTableWidgetItem(f"{value:.6f}" if isinstance(value, float) else str(value))
+            if 0 < column < 5:
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.vle_table.setItem(row, column, item)
+
+    def _remove_vle_row(self) -> None:
+        row = self.vle_table.currentRow()
+        if row < 0:
+            row = self.vle_table.rowCount() - 1
+        if row >= 0:
+            self.vle_table.removeRow(row)
+
+    def _load_example_vle(self) -> None:
+        fit_data = self.repository.fit_data_for(tuple(component.id for component in self._current_system().components))
+        rows: list[tuple[str, list[dict[str, object]], bool]] = []
+        for pair_key in self._pair_keys():
+            points = fit_data.get(pair_key)
+            reverse = False
+            if points is None:
+                reverse_key = "|".join(reversed(pair_key.split("|")))
+                points = fit_data.get(reverse_key)
+                reverse = points is not None
+            if points:
+                rows.append((pair_key, points, reverse))
+        if not rows:
+            QMessageBox.information(
+                self,
+                "Sin ejemplo VLE",
+                "Este sistema no tiene puntos VLE de ejemplo en la base. Ingréselos manualmente.",
+            )
+            return
+        self.vle_table.setRowCount(0)
+        for pair_key, points, reverse in rows:
+            for point in points:
+                x = tuple(float(value) for value in point["x"])
+                y = tuple(float(value) for value in point["y"])
+                if reverse:
+                    x = (x[1], x[0])
+                    y = (y[1], y[0])
+                temperature_c = (
+                    float(point["temperature_c"])
+                    if "temperature_c" in point
+                    else kelvin_to_celsius(float(point["temperature_k"]))
+                )
+                self._add_vle_row(
+                    temperature_c,
+                    float(point["pressure_kpa"]),
+                    x[0],
+                    y[0],
+                    str(point.get("source", "Ejemplo de base JSON")),
+                    pair_key,
+                )
+
+    def _vle_fit_data(self) -> dict[str, list[dict[str, object]]]:
+        if self.vle_table.rowCount() == 0:
+            return {}
+        required_pairs = set(self._pair_keys())
+        reverse_lookup = {"|".join(reversed(pair.split("|"))): pair for pair in required_pairs}
+        fit_data: dict[str, list[dict[str, object]]] = {}
+        for row in range(self.vle_table.rowCount()):
+            try:
+                raw_pair_key = self.vle_table.item(row, 0).text().strip()
+                if raw_pair_key in required_pairs:
+                    pair_key = raw_pair_key
+                elif raw_pair_key in reverse_lookup:
+                    pair_key = raw_pair_key
+                else:
+                    pair_key = ""
+                temperature_c = float(self.vle_table.item(row, 1).text().replace(",", "."))
+                pressure_kpa = float(self.vle_table.item(row, 2).text().replace(",", "."))
+                x1 = float(self.vle_table.item(row, 3).text().replace(",", "."))
+                y1 = float(self.vle_table.item(row, 4).text().replace(",", "."))
+                source = self.vle_table.item(row, 5).text().strip() or "Usuario"
+            except (AttributeError, ValueError) as exc:
+                raise InputValidationError(f"El punto VLE de la fila {row + 1} está incompleto o no es numérico.") from exc
+            if not pair_key:
+                valid = ", ".join(sorted(required_pairs))
+                raise InputValidationError(f"El par VLE de la fila {row + 1} no pertenece al sistema. Use: {valid}.")
+            if pressure_kpa <= 0:
+                raise InputValidationError(f"La presión VLE de la fila {row + 1} debe ser positiva.")
+            if not (0.0 < x1 < 1.0) or not (0.0 < y1 < 1.0):
+                raise InputValidationError(f"x1 e y1 de la fila {row + 1} deben estar entre 0 y 1, sin extremos.")
+            fit_data.setdefault(pair_key, []).append(
+                {
+                    "source": source,
+                    "temperature_c": temperature_c,
+                    "pressure_kpa": pressure_kpa,
+                    "x": [x1, 1.0 - x1],
+                    "y": [y1, 1.0 - y1],
+                }
+            )
+        if len(self._current_system().components) > 2 and self.activity_combo.currentData() == ActivityModel.WILSON.name:
+            covered = {
+                key if key in required_pairs else reverse_lookup.get(key, key)
+                for key in fit_data
+            }
+            missing = sorted(required_pairs - covered)
+            if missing:
+                raise InputValidationError(
+                    "Wilson multicomponente requiere datos VLE para todos los pares. "
+                    f"Faltan: {', '.join(missing)}."
+                )
+        return fit_data
+
+    @staticmethod
+    def _has_required_parameters(system, model: ActivityModel) -> bool:
+        parameters = system.binary_parameters.get(model.value, {})
+        pairs = parameters.get("pairs", {}) if isinstance(parameters, dict) else {}
+        if not isinstance(pairs, dict):
+            return False
+        component_ids = tuple(component.id for component in system.components)
+        if model in {ActivityModel.MARGULES, ActivityModel.VAN_LAAR} and len(component_ids) != 2:
+            return False
+        return all(
+            f"{first}|{second}" in pairs
+            for first in component_ids
+            for second in component_ids
+            if first != second
+        )
 
     def _update_fixed_variable(self) -> None:
         calculation = CalculationType[self.calculation_combo.currentData()]
@@ -348,7 +559,7 @@ class CalculationPage(QWidget):
             calculation_type = CalculationType[self.calculation_combo.currentData()]
             request = CalculationRequest(
                 calculation_type=calculation_type,
-                system_id="dynamic",
+                system_id=self.system_combo.currentData(),
                 activity_model=ActivityModel[self.activity_combo.currentData()],
                 vapor_model=VaporModel[self.vapor_combo.currentData()],
                 fixed_value=(
@@ -359,7 +570,7 @@ class CalculationPage(QWidget):
                 composition=self._composition(),
                 tolerance=self.tolerance.value(),
                 max_iterations=self.iterations.value(),
-                component_ids=tuple(self.selected_component_ids),
+                user_vle_fit_data=self._vle_fit_data(),
             )
             self.calculated.emit(self.service.calculate(request))
         except (InputValidationError, ValueError) as exc:
@@ -633,12 +844,12 @@ class ValidationsPage(QWidget):
         layout.addLayout(page_header("Validaciones", "Matriz prevista para evidencias científicas y numéricas."))
         layout.addWidget(warning_banner())
         table = QTableWidget(4, 5)
-        table.setHorizontalHeaderLabels(["Caso", "Propósito", "Estado POC", "Criterio final", "Evidencia"])
+        table.setHorizontalHeaderLabels(["Caso", "Propósito", "Estado BETA", "Criterio final", "Evidencia"])
         rows = [
-            ("Ciclohexano / n-Heptano", "Límite casi ideal", "Flujo disponible", "Recuperar Raoult", "Pendiente solver"),
-            ("Etanol / Tolueno", "Azeótropo", "Gráfico disponible", "Extremo Pxy/Txy", "Pendiente solver"),
-            ("Sistema ternario", "Multicomponente", "Tabla disponible", "≥ 3 especies", "Pendiente solver"),
-            ("Capítulo 14", "Referencia", "Diseño preparado", "Error < 2 %", "Pendiente solver"),
+            ("Wilson 14.54", "Sistemas binarios documentados", "Calculable", "Convergencia y curvas Pxy/Txy", "Suite pytest"),
+            ("Ciclohexano / n-Heptano", "Límite casi ideal", "Calculable", "Temperatura física", "Caso regresión"),
+            ("Margules / Van Laar", "Ajuste desde VLE", "Limitado por datos", "Solo si hay x/y/P/T", "Base JSON"),
+            ("Datos faltantes", "Política científica", "Bloqueo amigable", "No inventar parámetros", "Validación"),
         ]
         for row, values in enumerate(rows):
             for column, value in enumerate(values):
@@ -655,20 +866,19 @@ class DatabasePage(QWidget):
     def __init__(self, repository: DataRepository) -> None:
         super().__init__()
         layout = QVBoxLayout(self)
-        layout.addLayout(page_header("Base de datos", "Catálogo demostrativo; propiedades reales se incorporarán con fuente y rango."))
+        layout.addLayout(page_header("Base de datos", "Sistemas documentados disponibles y modelos habilitados."))
         layout.addWidget(warning_banner())
-        components = [(system, component) for system in repository.all_systems() for component in system.components]
-        table = QTableWidget(len(components), 7)
-        table.setHorizontalHeaderLabels(["Sistema", "Componente", "Fórmula", "Tc (K)", "Pc (kPa)", "ω", "Uso"])
-        for row, (system, component) in enumerate(components):
+        systems = repository.all_systems()
+        table = QTableWidget(len(systems), 6)
+        table.setHorizontalHeaderLabels(["Sistema", "Componentes", "Modelos", "Tipo", "Fuente / descripción", "Estado"])
+        for row, system in enumerate(systems):
             values = (
                 system.name,
-                component.name,
-                component.formula,
-                f"{component.tc_k:.2f}",
-                f"{component.pc_kpa:.2f}",
-                f"{component.omega:.3f}",
+                " / ".join(component.name for component in system.components),
+                ", ".join(system.available_models),
                 system.kind,
+                system.description,
+                "Completo" if system.available_models else "Incompleto",
             )
             for column, value in enumerate(values):
                 table.setItem(row, column, QTableWidgetItem(value))
@@ -682,13 +892,13 @@ class AboutPage(QWidget):
     def __init__(self) -> None:
         super().__init__()
         layout = QVBoxLayout(self)
-        layout.addLayout(page_header("Acerca del proyecto", "Alcance, arquitectura y límites de esta prueba de concepto."))
+        layout.addLayout(page_header("Acerca del proyecto", "Alcance, arquitectura y límites de la versión BETA."))
         layout.addWidget(warning_banner())
         panel = QFrame()
         panel.setObjectName("card")
         panel_layout = QVBoxLayout(panel)
         text = QLabel(
-            "<h2>VLE Gamma-Phi · POC 0.1</h2>"
+            "<h2>VLE Gamma-Phi · BETA</h2>"
             "<p>Interfaz desarrollada con PySide6 y Matplotlib. El núcleo actual es un servicio "
             "termodinámico real para sistemas con datos completos documentados.</p>"
             "<p><b>Política de datos:</b> si faltan parámetros Antoine, Pitzer o binarios, "
@@ -709,7 +919,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.repository = repository or DataRepository()
         self.service = ThermodynamicVLEService(self.repository)
-        self.setWindowTitle("VLE Gamma-Phi — POC")
+        self.setWindowTitle("VLE Gamma-Phi — BETA")
         self.setMinimumSize(1120, 720)
         self.resize(1320, 820)
         self.setStyleSheet(APP_STYLE)
@@ -726,7 +936,7 @@ class MainWindow(QMainWindow):
         sidebar_layout = QVBoxLayout(sidebar)
         brand = QLabel("VLE · γ/φ")
         brand.setObjectName("brand")
-        subtitle = QLabel("Termodinámica química\nPrueba de concepto")
+        subtitle = QLabel("Termodinámica química\nBETA documentada")
         subtitle.setObjectName("subtitle")
         sidebar_layout.addWidget(brand)
         sidebar_layout.addWidget(subtitle)
@@ -740,7 +950,7 @@ class MainWindow(QMainWindow):
             self.nav_group.addButton(button, index)
             sidebar_layout.addWidget(button)
         sidebar_layout.addStretch()
-        version = QLabel("POC 0.2 · MOTOR REAL")
+        version = QLabel("BETA · MOTOR REAL")
         version.setStyleSheet("color: #9bc0c7; padding: 14px;")
         sidebar_layout.addWidget(version)
         root_layout.addWidget(sidebar)

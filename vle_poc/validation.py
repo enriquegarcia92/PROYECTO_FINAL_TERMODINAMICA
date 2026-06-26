@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 
-from .domain import CalculationRequest, CalculationType, SystemDefinition
+from .domain import ActivityModel, CalculationRequest, CalculationType, SystemDefinition
 from .units import kelvin_to_celsius
 
 
@@ -41,17 +41,20 @@ def validate_request(request: CalculationRequest, system: SystemDefinition) -> C
             raise InputValidationError(
                 "La temperatura ingresada debe estar entre "
                 f"{lower_c:.2f} °C y {upper_c:.2f} °C "
-                "(equivalente a 180 K y 800 K para esta POC)."
+                "(equivalente a 180 K y 800 K para esta BETA)."
             )
     else:
         if request.fixed_value <= 0 or not math.isfinite(request.fixed_value):
             raise InputValidationError("Presión debe ser un número positivo y finito.")
         if request.fixed_value > 10_000:
-            raise InputValidationError("La presión excede el límite de 10 000 kPa de esta POC.")
-    if request.activity_model.value not in system.available_models:
+            raise InputValidationError("La presión excede el límite de 10 000 kPa de esta BETA.")
+    if request.activity_model.value not in system.available_models and not request.user_vle_fit_data:
         raise InputValidationError(
-            f"No hay parámetros {request.activity_model.value} para {system.name}."
+            f"El modelo {request.activity_model.value} no está disponible para {system.name}."
         )
+    if request.user_vle_fit_data and request.activity_model in {ActivityModel.MARGULES, ActivityModel.VAN_LAAR}:
+        if len(system.components) != 2:
+            raise InputValidationError(f"{request.activity_model.value} solo aplica a sistemas binarios.")
     if request.tolerance <= 0 or request.tolerance >= 0.1:
         raise InputValidationError("La tolerancia debe ser positiva y menor que 0.1.")
     if request.max_iterations < 5 or request.max_iterations > 10_000:
@@ -66,4 +69,5 @@ def validate_request(request: CalculationRequest, system: SystemDefinition) -> C
         tolerance=request.tolerance,
         max_iterations=request.max_iterations,
         component_ids=request.component_ids,
+        user_vle_fit_data=request.user_vle_fit_data,
     )

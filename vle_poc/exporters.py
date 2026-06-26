@@ -101,6 +101,24 @@ def format_result_txt(result: CalculationResult) -> str:
         lines.extend(["", "Fuentes de datos", "-" * 20])
         lines.extend(f"- {source}" for source in result.data_sources)
 
+    if result.vle_fit_data_used:
+        lines.extend(["", "Datos VLE ingresados/usados para ajuste", "-" * 40])
+        lines.append(f"{'Par':<32}{'T (°C/K)':>18}{'P kPa':>12}{'x':>18}{'y':>18}{'Fuente':>24}")
+        for point in result.vle_fit_data_used:
+            temperature = (
+                f"{float(point['temperature_c']):.6f} °C"
+                if "temperature_c" in point
+                else f"{float(point['temperature_k']):.6f} K"
+            )
+            lines.append(
+                f"{str(point.get('pair_key', '')):<32}"
+                f"{temperature:>18}"
+                f"{float(point['pressure_kpa']):>12.6f}"
+                f"{str(point['x']):>18}"
+                f"{str(point['y']):>18}"
+                f"{str(point.get('source', 'Usuario')):>24}"
+            )
+
     lines.extend(
         [
             "",

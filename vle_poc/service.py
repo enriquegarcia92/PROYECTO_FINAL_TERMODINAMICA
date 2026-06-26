@@ -17,6 +17,13 @@ from .validation import InputValidationError, validate_request
 
 
 SIMULATION_WARNING = "Cálculo termodinámico real cuando existen datos completos; no se inventan parámetros faltantes."
+VLLE_1427_SYSTEM_ID = "water_n_pentane_n_heptane_1427"
+VLLE_1427_WARNING = (
+    "El problema 14.27 describe dos fases líquidas inmiscibles. "
+    "El método físicamente recomendado es Raoult ideal para la fase hidrocarburo "
+    "+ agua como fase líquida separada. Wilson se habilita solo por requerimiento "
+    "del proyecto y no representa correctamente LLE/VLLE."
+)
 
 
 class ThermodynamicVLEService:
@@ -43,21 +50,54 @@ class ThermodynamicVLEService:
         request: CalculationRequest,
         system: SystemDefinition,
     ) -> SystemDefinition:
+        user_supplied_fit_data = bool(request.user_vle_fit_data)
+        if (
+            not user_supplied_fit_data
+            and request.activity_model is ActivityModel.WILSON
+            and self._has_required_parameters(
+            system, request.activity_model
+            )
+        ):
+            self._parameter_warnings = ()
+            return system
         component_ids = tuple(component.id for component in system.components)
-        fit_data = self.repository.fit_data_for(component_ids)
+        fit_data = request.user_vle_fit_data or self.repository.fit_data_for(component_ids)
+        if not fit_data:
+            raise InputValidationError(
+                "Ingrese datos VLE x/y/P/T para ajustar el modelo seleccionado antes de ejecutar."
+            )
         fitted = self.parameter_fitter.fit(system, request.activity_model, fit_data)
         parameters = dict(system.binary_parameters)
         parameters[request.activity_model.value] = fitted.parameters
         warnings = list(fitted.warnings)
-        try:
-            self.repository.persist_calculated_parameters(request.activity_model.value, fitted.parameters)
-        except OSError as exc:
-            warnings.append(
-                "Los parámetros se calcularon en memoria, pero no se pudieron guardar en la base JSON: "
-                f"{exc}"
+        if user_supplied_fit_data:
+            warnings.append("Parámetros ajustados desde datos VLE ingresados por usuario; no se guardaron en JSON.")
+        else:
+            try:
+                self.repository.persist_calculated_parameters(request.activity_model.value, fitted.parameters)
+            except OSError as exc:
+                warnings.append(
+                    "Los parámetros se calcularon en memoria, pero no se pudieron guardar en la base JSON: "
+                    f"{exc}"
             )
         self._parameter_warnings = tuple(warnings)
         return replace(system, binary_parameters=parameters)
+
+    @staticmethod
+    def _has_required_parameters(system: SystemDefinition, model: ActivityModel) -> bool:
+        parameters = system.binary_parameters.get(model.value, {})
+        pairs = parameters.get("pairs", {}) if isinstance(parameters, dict) else {}
+        if not isinstance(pairs, dict):
+            return False
+        component_ids = tuple(component.id for component in system.components)
+        if model in {ActivityModel.MARGULES, ActivityModel.VAN_LAAR} and len(component_ids) != 2:
+            return False
+        return all(
+            f"{first}|{second}" in pairs
+            for first in component_ids
+            for second in component_ids
+            if first != second
+        )
 
     @staticmethod
     def _normalize(values: np.ndarray) -> np.ndarray:
@@ -300,6 +340,11 @@ class ThermodynamicVLEService:
                 {
                     *(component.antoine.source for component in system.components if component.antoine is not None),
                     system.binary_parameters.get(request.activity_model.value, {}).get("source", ""),
+                    *(
+                        ["Parámetros ajustados desde datos VLE ingresados por usuario"]
+                        if request.user_vle_fit_data
+                        else []
+                    ),
                 }
                 - {""}
             )
@@ -333,7 +378,7 @@ class ThermodynamicVLEService:
                 "suma_x": float(abs(np.sum(x) - 1.0)),
                 "suma_y": float(abs(np.sum(y) - 1.0)),
             },
-            warnings=self._parameter_warnings,
+            warnings=(*self._parameter_warnings, *self._system_specific_warnings(system)),
             message="Cálculo termodinámico real completado con parámetros calculados desde datos VLE.",
             activity_model=request.activity_model.value,
             vapor_model=request.vapor_model.value,
@@ -344,9 +389,18 @@ class ThermodynamicVLEService:
             psat_kpa=tuple(float(value) for value in psat),
             k_values=tuple(float(value) for value in k),
             data_sources=sources,
+            vle_fit_data_used=self._flatten_fit_data(request.user_vle_fit_data),
         )
         result.assert_shape()
         return result
+
+    @staticmethod
+    def _flatten_fit_data(fit_data: dict[str, list[dict[str, object]]]) -> tuple[dict[str, object], ...]:
+        rows: list[dict[str, object]] = []
+        for pair_key, points in fit_data.items():
+            for point in points:
+                rows.append({"pair_key": pair_key, **dict(point)})
+        return tuple(rows)
 
     def phase_curve(self, system_id: str, diagram_type: str, fixed_value: float) -> dict[str, np.ndarray]:
         system = self.repository.get(system_id)
@@ -417,6 +471,7 @@ class ThermodynamicVLEService:
                 fixed_value,
                 composition,
                 component_ids=component_ids,
+                user_vle_fit_data=self._fit_data_from_result(result),
             )
             curve_result = self.calculate(request)
             liquid_values.append(curve_result.pressure_kpa if diagram_type == "Pxy" else curve_result.temperature_k)
@@ -461,6 +516,23 @@ class ThermodynamicVLEService:
         else:
             weights = tail / tail_sum
         return tuple([x1, *list((weights * remaining).astype(float))])
+
+    @staticmethod
+    def _fit_data_from_result(result: CalculationResult) -> dict[str, list[dict[str, object]]]:
+        fit_data: dict[str, list[dict[str, object]]] = {}
+        for row in result.vle_fit_data_used:
+            pair_key = str(row.get("pair_key", "")).strip()
+            if not pair_key:
+                continue
+            point = {key: value for key, value in row.items() if key != "pair_key"}
+            fit_data.setdefault(pair_key, []).append(point)
+        return fit_data
+
+    @staticmethod
+    def _system_specific_warnings(system: SystemDefinition) -> tuple[str, ...]:
+        if system.id == VLLE_1427_SYSTEM_ID:
+            return (VLLE_1427_WARNING,)
+        return ()
 
     def _component_ids_from_result(self, result: CalculationResult) -> tuple[str, ...]:
         catalog = {component.name: component.id for component in self.repository.all_components()}

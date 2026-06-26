@@ -3,7 +3,8 @@ from __future__ import annotations
 from vle_poc.domain import ActivityModel, CalculationRequest, CalculationType, VaporModel
 from vle_poc.exporters import format_result_txt
 from vle_poc.repository import DataRepository
-from vle_poc.service import SIMULATION_WARNING, ThermodynamicVLEService
+from vle_poc.properties import psat_kpa
+from vle_poc.service import SIMULATION_WARNING, VLLE_1427_WARNING, ThermodynamicVLEService
 
 
 def test_result_txt_contains_required_sections() -> None:
@@ -43,3 +44,42 @@ def test_result_txt_contains_required_sections() -> None:
     assert "Valores K" in text
     assert "Fuentes de datos" in text
     assert "motor termodinamico" in text
+
+
+def test_problem_1427_warning_is_exported_to_txt() -> None:
+    repository = DataRepository()
+    service = ThermodynamicVLEService(repository)
+    system = repository.get("water_n_pentane_n_heptane_1427")
+    temperature_k = 330.0
+    fit_data: dict[str, list[dict[str, object]]] = {}
+    for index, first in enumerate(system.components):
+        for second in system.components[index + 1 :]:
+            x = (0.45, 0.55)
+            psat = (psat_kpa(first, temperature_k), psat_kpa(second, temperature_k))
+            pressure_kpa = sum(x_i * psat_i for x_i, psat_i in zip(x, psat))
+            y = tuple(x_i * psat_i / pressure_kpa for x_i, psat_i in zip(x, psat))
+            fit_data[f"{first.id}|{second.id}"] = [
+                {
+                    "source": "Usuario prueba TXT",
+                    "temperature_k": temperature_k,
+                    "pressure_kpa": pressure_kpa,
+                    "x": list(x),
+                    "y": list(y),
+                }
+            ]
+    result = service.calculate(
+        CalculationRequest(
+            CalculationType.BUBL_P,
+            system.id,
+            ActivityModel.WILSON,
+            VaporModel.COMPARE,
+            temperature_k,
+            (0.45, 0.30, 0.25),
+            user_vle_fit_data=fit_data,
+        )
+    )
+
+    text = format_result_txt(result)
+
+    assert VLLE_1427_WARNING in text
+    assert "water|n_pentane" in text

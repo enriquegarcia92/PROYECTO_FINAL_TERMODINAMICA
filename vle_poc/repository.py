@@ -1,4 +1,4 @@
-"""Carga catálogo de sustancias, plantillas y construye sistemas dinámicos."""
+"""Carga catálogo de sustancias y sistemas documentados calculables."""
 
 from __future__ import annotations
 
@@ -47,6 +47,7 @@ class DataRepository:
                     name=template["name"],
                     description=template["description"],
                     kind=template["kind"],
+                    available_models=tuple(template.get("available_models", ("Wilson",))),
                     validate_count=False,
                 )
                 self._systems[system.id] = system
@@ -98,6 +99,7 @@ class DataRepository:
         name: str | None = None,
         description: str | None = None,
         kind: str = "Dinámico",
+        available_models: tuple[str, ...] | None = None,
         validate_count: bool = True,
     ) -> SystemDefinition:
         if len(set(component_ids)) != len(component_ids):
@@ -114,7 +116,7 @@ class DataRepository:
             name=system_name,
             description=description or "Sistema construido desde el catálogo de sustancias.",
             components=components,
-            available_models=("Wilson", "Margules", "Van Laar"),
+            available_models=available_models or ("Wilson", "Margules", "Van Laar"),
             kind=kind,
             binary_parameters=self._parameters_for(component_ids),
         )

@@ -1,8 +1,8 @@
-"""Menú de consola mínimo que consume el mismo contrato que la GUI."""
+"""Menú de consola mínimo para sistemas VLE documentados."""
 
-from vle_poc.domain import MAX_COMPONENTS, MIN_COMPONENTS, ActivityModel, CalculationRequest, CalculationType, VaporModel
+from vle_poc.domain import ActivityModel, CalculationRequest, CalculationType, VaporModel
 from vle_poc.repository import DataRepository
-from vle_poc.service import SIMULATION_WARNING, ThermodynamicVLEService
+from vle_poc.service import SIMULATION_WARNING, VLLE_1427_SYSTEM_ID, VLLE_1427_WARNING, ThermodynamicVLEService
 from vle_poc.units import celsius_to_kelvin, kelvin_to_celsius
 from vle_poc.validation import InputValidationError
 
@@ -17,6 +17,57 @@ def choose(title: str, options: list[tuple[str, object]]) -> object:
     return options[selected][1]
 
 
+def read_vle_fit_data(system) -> dict[str, list[dict[str, object]]]:
+    fit_data: dict[str, list[dict[str, object]]] = {}
+    components = system.components
+    for pair_index, first in enumerate(components):
+        for second in components[pair_index + 1 :]:
+            pair_key = f"{first.id}|{second.id}"
+            print(f"\nDatos VLE para {first.name} / {second.name}")
+            print("Ingrese x1 e y1 para el primer componente del par. x2 e y2 se calculan como 1-x1 y 1-y1.")
+            count = int(input("Cantidad de puntos VLE a ingresar para este par: "))
+            if count <= 0:
+                raise InputValidationError(f"Debe ingresar al menos un punto VLE para {pair_key}.")
+            points: list[dict[str, object]] = []
+            for index in range(count):
+                print(f"\nPunto VLE {index + 1} de {pair_key}")
+                temperature_c = float(input("  Temperatura (°C): "))
+                pressure_kpa = float(input("  Presión (kPa): "))
+                x1 = float(input(f"  x1 ({first.name}): "))
+                y1 = float(input(f"  y1 ({first.name}): "))
+                if pressure_kpa <= 0:
+                    raise InputValidationError("La presión VLE debe ser positiva.")
+                if not (0.0 < x1 < 1.0) or not (0.0 < y1 < 1.0):
+                    raise InputValidationError("x1 e y1 deben estar entre 0 y 1, sin extremos.")
+                points.append(
+                    {
+                        "source": "Usuario CLI",
+                        "temperature_c": temperature_c,
+                        "pressure_kpa": pressure_kpa,
+                        "x": [x1, 1.0 - x1],
+                        "y": [y1, 1.0 - y1],
+                    }
+                )
+            fit_data[pair_key] = points
+    return fit_data
+
+
+def has_required_parameters(system, model: ActivityModel) -> bool:
+    parameters = system.binary_parameters.get(model.value, {})
+    pairs = parameters.get("pairs", {}) if isinstance(parameters, dict) else {}
+    if not isinstance(pairs, dict):
+        return False
+    component_ids = tuple(component.id for component in system.components)
+    if model in {ActivityModel.MARGULES, ActivityModel.VAN_LAAR} and len(component_ids) != 2:
+        return False
+    return all(
+        f"{first}|{second}" in pairs
+        for first in component_ids
+        for second in component_ids
+        if first != second
+    )
+
+
 def main() -> int:
     repository = DataRepository()
     service = ThermodynamicVLEService(repository)
@@ -24,25 +75,24 @@ def main() -> int:
     print(SIMULATION_WARNING)
     try:
         calculation = choose("Tipo de cálculo", [(item.value, item) for item in CalculationType])
-        selected_components: list[str] = []
-        while len(selected_components) < MAX_COMPONENTS:
-            component = choose(
-                "Seleccione sustancia para agregar",
-                [
-                    (f"{item.name} ({item.formula})", item)
-                    for item in repository.all_components()
-                    if item.id not in selected_components
-                ],
-            )
-            selected_components.append(component.id)
-            print("Sistema actual:", " / ".join(repository.get_component(item).name for item in selected_components))
-            if len(selected_components) >= MIN_COMPONENTS:
-                more = input("¿Agregar otra sustancia? (s/N): ").strip().lower()
-                if more != "s":
-                    break
-        system = repository.build_system(tuple(selected_components))
-        activity = choose("Modelo de actividad", [(item.value, item) for item in ActivityModel])
+        system = choose("Sistema documentado", [(item.name, item) for item in repository.all_systems()])
+        if system.id == VLLE_1427_SYSTEM_ID:
+            print(f"\nAdvertencia 14.27: {VLLE_1427_WARNING}")
+        available_models = (
+            [ActivityModel.WILSON, ActivityModel.MARGULES, ActivityModel.VAN_LAAR]
+            if len(system.components) == 2
+            else [ActivityModel.WILSON]
+        )
+        activity = choose(
+            "Modelo de actividad",
+            [(model.value, model) for model in available_models],
+        )
         vapor = choose("Modelo de vapor", [(item.value, item) for item in VaporModel])
+        user_vle_fit_data = {}
+        if has_required_parameters(system, activity):
+            print("\nEste sistema ya tiene parámetros documentados para el modelo seleccionado.")
+        else:
+            user_vle_fit_data = read_vle_fit_data(system)
         variable = calculation.fixed_variable
         unit = "°C" if variable == "temperatura" else "kPa"
         fixed_value = float(input(f"Ingrese {variable} ({unit}): "))
@@ -53,12 +103,12 @@ def main() -> int:
         result = service.calculate(
             CalculationRequest(
                 calculation,
-                "dynamic",
+                system.id,
                 activity,
                 vapor,
                 fixed_value,
                 composition,
-                component_ids=tuple(selected_components),
+                user_vle_fit_data=user_vle_fit_data,
             )
         )
     except (ValueError, InputValidationError) as exc:

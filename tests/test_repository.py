@@ -1,45 +1,61 @@
 from vle_poc.repository import DataRepository
-from vle_poc.validation import InputValidationError
 
 
-def test_demo_database_has_binary_and_multicomponent_systems() -> None:
+def test_beta_database_has_documented_binary_systems() -> None:
     systems = DataRepository().all_systems()
     sizes = {len(system.components) for system in systems}
-    assert 2 in sizes
-    assert any(size >= 3 for size in sizes)
+    assert sizes == {2, 3}
+    assert len(systems) >= 10
 
 
-def test_all_systems_support_three_activity_models() -> None:
-    for system in DataRepository().all_systems():
-        assert set(system.available_models) == {"Wilson", "Margules", "Van Laar"}
+def test_systems_declare_only_available_models() -> None:
+    repository = DataRepository()
+    assert repository.get("benzene_n_hexane").available_models == ("Wilson",)
+    assert repository.get("cyclohexane_n_heptane").available_models == ("Wilson", "Margules", "Van Laar")
+    assert repository.get("acetone_methanol").available_models == ("Margules",)
 
 
 def test_component_catalog_is_loaded() -> None:
     components = DataRepository().all_components()
     ids = {component.id for component in components}
-    assert {"cyclohexane", "n_heptane", "ethanol", "toluene"}.issubset(ids)
+    assert {"benzene", "carbon_tetrachloride", "cyclohexane", "n_heptane", "n_hexane", "water", "n_pentane"}.issubset(ids)
 
 
-def test_dynamic_system_can_be_built_with_two_three_and_five_components() -> None:
+def test_problem_1427_is_available_only_for_wilson() -> None:
+    system = DataRepository().get("water_n_pentane_n_heptane_1427")
+    assert tuple(component.id for component in system.components) == ("water", "n_pentane", "n_heptane")
+    assert system.available_models == ("Wilson",)
+    assert "VLLE inmiscible" in system.kind
+
+
+def test_acetone_methanol_water_ternary_is_available_only_for_wilson() -> None:
+    system = DataRepository().get("acetone_methanol_water_1220_1222")
+    assert tuple(component.id for component in system.components) == ("acetone", "methanol", "water")
+    assert system.available_models == ("Wilson",)
+    assert "Tabla 12.5" in system.description
+
+
+def test_wilson_1454_parameters_are_loaded_for_fixed_systems() -> None:
     repository = DataRepository()
-    binary = repository.build_system(("cyclohexane", "n_heptane"))
-    ternary = repository.build_system(("acetone", "methanol", "benzene"))
-    five = repository.build_system(("cyclohexane", "n_heptane", "ethanol", "toluene", "benzene"))
-    assert len(binary.components) == 2
-    assert len(ternary.components) == 3
-    assert len(five.components) == 5
+    system = repository.get("benzene_carbon_tetrachloride")
+    pairs = system.binary_parameters["Wilson"]["pairs"]
+    assert pairs["benzene|carbon_tetrachloride"]["value"] == 1.0372
+    assert pairs["carbon_tetrachloride|benzene"]["value"] == 0.8637
 
 
-def test_dynamic_system_rejects_one_repeated_or_more_than_five_components() -> None:
+def test_wilson_125_parameters_are_loaded_for_acetone_methanol_water() -> None:
     repository = DataRepository()
-    for component_ids in [
-        ("cyclohexane",),
-        ("cyclohexane", "cyclohexane"),
-        ("cyclohexane", "n_heptane", "ethanol", "toluene", "benzene", "methanol"),
-    ]:
-        try:
-            repository.build_system(component_ids)
-        except InputValidationError:
-            pass
-        else:
-            raise AssertionError(f"Se esperaba rechazo para {component_ids}")
+    system = repository.get("acetone_methanol_water_1220_1222")
+    pairs = system.binary_parameters["Wilson"]["pairs"]
+    expected = {
+        "acetone|methanol": 583.11,
+        "methanol|acetone": 161.88,
+        "acetone|water": 1448.01,
+        "water|acetone": 291.27,
+        "methanol|water": 469.55,
+        "water|methanol": 107.38,
+    }
+    for pair_key, value in expected.items():
+        assert pairs[pair_key]["type"] == "energy_difference"
+        assert pairs[pair_key]["units"] == "cal/mol"
+        assert pairs[pair_key]["value"] == value

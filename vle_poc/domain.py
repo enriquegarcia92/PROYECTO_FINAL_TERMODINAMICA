@@ -82,6 +82,7 @@ class CalculationRequest:
     tolerance: float = 1e-4
     max_iterations: int = 100
     component_ids: tuple[str, ...] = field(default_factory=tuple)
+    user_vle_fit_data: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -111,6 +112,7 @@ class CalculationResult:
     psat_kpa: tuple[float, ...] = field(default_factory=tuple)
     k_values: tuple[float, ...] = field(default_factory=tuple)
     data_sources: tuple[str, ...] = field(default_factory=tuple)
+    vle_fit_data_used: tuple[dict[str, Any], ...] = field(default_factory=tuple)
 
     def assert_shape(self) -> None:
         """Comprueba que todos los vectores coincidan con los componentes."""

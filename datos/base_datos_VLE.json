@@ -52,13 +52,49 @@
       }
     },
     {
+      "id": "water",
+      "name": "Agua",
+      "formula": "H2O",
+      "tc_k": 647.1,
+      "pc_kpa": 22064.0,
+      "omega": 0.344,
+      "liquid_molar_volume_m3_mol": 1.807e-05,
+      "antoine": {
+        "a": 16.3872,
+        "b": 3885.70,
+        "c": 230.170,
+        "t_min_c": 0.0,
+        "t_max_c": 200.0,
+        "convention": "ln_kpa_celsius",
+        "source": "Smith, Van Ness & Abbott, Tabla B.2."
+      }
+    },
+    {
+      "id": "n_pentane",
+      "name": "n-Pentano",
+      "formula": "C5H12",
+      "tc_k": 469.7,
+      "pc_kpa": 3370.0,
+      "omega": 0.251,
+      "liquid_molar_volume_m3_mol": 0.000116,
+      "antoine": {
+        "a": 13.7667,
+        "b": 2451.88,
+        "c": 232.014,
+        "t_min_c": 2.0,
+        "t_max_c": 125.0,
+        "convention": "ln_kpa_celsius",
+        "source": "Smith, Van Ness & Abbott, Tabla B.2."
+      }
+    },
+    {
       "id": "ethanol",
       "name": "Etanol",
       "formula": "C2H6O",
       "tc_k": 514.0,
       "pc_kpa": 6137.0,
       "omega": 0.644,
-      "liquid_molar_volume_m3_mol": 0.0000585,
+      "liquid_molar_volume_m3_mol": 5.85e-05,
       "antoine": {
         "a": 16.8958,
         "b": 3795.17,
@@ -78,7 +114,7 @@
       "omega": 0.264,
       "liquid_molar_volume_m3_mol": 0.000106,
       "antoine": {
-        "a": 13.9320,
+        "a": 13.932,
         "b": 3056.96,
         "c": 217.625,
         "t_min_c": 13.0,
@@ -94,11 +130,11 @@
       "tc_k": 508.1,
       "pc_kpa": 4700.0,
       "omega": 0.307,
-      "liquid_molar_volume_m3_mol": 0.000074,
+      "liquid_molar_volume_m3_mol": 7.4e-05,
       "antoine": {
         "a": 14.3145,
         "b": 2756.22,
-        "c": 228.060,
+        "c": 228.06,
         "t_min_c": -26.0,
         "t_max_c": 77.0,
         "convention": "ln_kpa_celsius",
@@ -112,11 +148,11 @@
       "tc_k": 512.6,
       "pc_kpa": 8096.0,
       "omega": 0.565,
-      "liquid_molar_volume_m3_mol": 0.0000407,
+      "liquid_molar_volume_m3_mol": 4.07e-05,
       "antoine": {
         "a": 16.5785,
         "b": 3638.27,
-        "c": 239.500,
+        "c": 239.5,
         "t_min_c": -11.0,
         "t_max_c": 83.0,
         "convention": "ln_kpa_celsius",
@@ -130,7 +166,7 @@
       "tc_k": 562.2,
       "pc_kpa": 4890.0,
       "omega": 0.212,
-      "liquid_molar_volume_m3_mol": 0.0000894,
+      "liquid_molar_volume_m3_mol": 8.94e-05,
       "antoine": {
         "a": 13.7819,
         "b": 2726.81,
@@ -140,38 +176,202 @@
         "convention": "ln_kpa_celsius",
         "source": "Smith, Van Ness & Abbott, Tabla B.2."
       }
+    },
+    {
+      "id": "carbon_tetrachloride",
+      "name": "Tetracloruro de carbono",
+      "formula": "CCl4",
+      "tc_k": 556.4,
+      "pc_kpa": 4560.0,
+      "omega": 0.193,
+      "liquid_molar_volume_m3_mol": 9.71e-05,
+      "antoine": {
+        "a": 14.0572,
+        "b": 2914.23,
+        "c": 232.148,
+        "t_min_c": 14.0,
+        "t_max_c": 101.0,
+        "convention": "ln_kpa_celsius",
+        "source": "Smith, Van Ness & Abbott, Tabla B.2."
+      }
+    },
+    {
+      "id": "n_hexane",
+      "name": "n-Hexano",
+      "formula": "C6H14",
+      "tc_k": 507.6,
+      "pc_kpa": 3025.0,
+      "omega": 0.301,
+      "liquid_molar_volume_m3_mol": 0.0001316,
+      "antoine": {
+        "a": 13.8193,
+        "b": 2696.04,
+        "c": 224.317,
+        "t_min_c": 19.0,
+        "t_max_c": 92.0,
+        "convention": "ln_kpa_celsius",
+        "source": "Smith, Van Ness & Abbott, Tabla B.2; ver Solución 6.6 para n-hexano."
+      }
     }
   ],
   "binary_parameters": {
     "Wilson": {
+      "benzene|carbon_tetrachloride": {
+        "source": "Smith, Van Ness & Abbott, problema 14.54(a), 100 °C.",
+        "type": "dimensionless_lambda",
+        "value": 1.0372
+      },
+      "carbon_tetrachloride|benzene": {
+        "source": "Smith, Van Ness & Abbott, problema 14.54(a), 100 °C.",
+        "type": "dimensionless_lambda",
+        "value": 0.8637
+      },
+      "benzene|cyclohexane": {
+        "source": "Smith, Van Ness & Abbott, problema 14.54(b), 100 °C.",
+        "type": "dimensionless_lambda",
+        "value": 1.0773
+      },
+      "cyclohexane|benzene": {
+        "source": "Smith, Van Ness & Abbott, problema 14.54(b), 100 °C.",
+        "type": "dimensionless_lambda",
+        "value": 0.71
+      },
+      "benzene|n_heptane": {
+        "source": "Smith, Van Ness & Abbott, problema 14.54(c), 100 °C.",
+        "type": "dimensionless_lambda",
+        "value": 1.2908
+      },
+      "n_heptane|benzene": {
+        "source": "Smith, Van Ness & Abbott, problema 14.54(c), 100 °C.",
+        "type": "dimensionless_lambda",
+        "value": 0.5011
+      },
+      "benzene|n_hexane": {
+        "source": "Smith, Van Ness & Abbott, problema 14.54(d), 100 °C.",
+        "type": "dimensionless_lambda",
+        "value": 1.3684
+      },
+      "n_hexane|benzene": {
+        "source": "Smith, Van Ness & Abbott, problema 14.54(d), 100 °C.",
+        "type": "dimensionless_lambda",
+        "value": 0.453
+      },
+      "carbon_tetrachloride|cyclohexane": {
+        "source": "Smith, Van Ness & Abbott, problema 14.54(e), 100 °C.",
+        "type": "dimensionless_lambda",
+        "value": 1.1619
+      },
+      "cyclohexane|carbon_tetrachloride": {
+        "source": "Smith, Van Ness & Abbott, problema 14.54(e), 100 °C.",
+        "type": "dimensionless_lambda",
+        "value": 0.7757
+      },
+      "carbon_tetrachloride|n_heptane": {
+        "source": "Smith, Van Ness & Abbott, problema 14.54(f), 100 °C.",
+        "type": "dimensionless_lambda",
+        "value": 1.541
+      },
+      "n_heptane|carbon_tetrachloride": {
+        "source": "Smith, Van Ness & Abbott, problema 14.54(f), 100 °C.",
+        "type": "dimensionless_lambda",
+        "value": 0.5197
+      },
+      "carbon_tetrachloride|n_hexane": {
+        "source": "Smith, Van Ness & Abbott, problema 14.54(g), 100 °C.",
+        "type": "dimensionless_lambda",
+        "value": 1.2839
+      },
+      "n_hexane|carbon_tetrachloride": {
+        "source": "Smith, Van Ness & Abbott, problema 14.54(g), 100 °C.",
+        "type": "dimensionless_lambda",
+        "value": 0.6011
+      },
       "cyclohexane|n_heptane": {
-        "source": "Punto VLE demostrativo ciclohexano/n-heptano derivado del problema 14.54(h) para validar ajuste automático. Sustituir por dato experimental para informe final.",
-        "calculated_from_vle": true,
-        "calculated_at_utc": "2026-06-24T03:30:21+00:00",
-        "points_used": 1,
-        "residual_sum_squares": 1.4380293138940171e-9,
-        "type": "energy_difference",
-        "value": 136.99077241739445,
-        "lambda_ij_minus_lambda_ii": 136.99077241739445,
-        "units": "J/mol"
+        "source": "Smith, Van Ness & Abbott, problema 14.54(h), 100 °C.",
+        "type": "dimensionless_lambda",
+        "value": 1.2996
       },
       "n_heptane|cyclohexane": {
-        "source": "Punto VLE demostrativo ciclohexano/n-heptano derivado del problema 14.54(h) para validar ajuste automático. Sustituir por dato experimental para informe final.",
-        "calculated_from_vle": true,
-        "calculated_at_utc": "2026-06-24T03:30:21+00:00",
-        "points_used": 1,
-        "residual_sum_squares": 1.4380293138940171e-9,
+        "source": "Smith, Van Ness & Abbott, problema 14.54(h), 100 °C.",
+        "type": "dimensionless_lambda",
+        "value": 0.7046
+      },
+      "cyclohexane|n_hexane": {
+        "source": "Smith, Van Ness & Abbott, problema 14.54(i), 100 °C.",
+        "type": "dimensionless_lambda",
+        "value": 1.4187
+      },
+      "n_hexane|cyclohexane": {
+        "source": "Smith, Van Ness & Abbott, problema 14.54(i), 100 °C.",
+        "type": "dimensionless_lambda",
+        "value": 0.5901
+      },
+      "acetone|methanol": {
+        "source": "Smith, Van Ness & Abbott, Tabla 12.5; problemas 12.20 y 12.22. Valores recomendados por Gmehling et al., DECHEMA.",
         "type": "energy_difference",
-        "value": 126.76222735804971,
-        "lambda_ij_minus_lambda_ii": 126.76222735804971,
-        "units": "J/mol"
+        "lambda_ij_minus_lambda_ii": 583.11,
+        "value": 583.11,
+        "units": "cal/mol"
+      },
+      "methanol|acetone": {
+        "source": "Smith, Van Ness & Abbott, Tabla 12.5; problemas 12.20 y 12.22. Valores recomendados por Gmehling et al., DECHEMA.",
+        "type": "energy_difference",
+        "lambda_ij_minus_lambda_ii": 161.88,
+        "value": 161.88,
+        "units": "cal/mol"
+      },
+      "acetone|water": {
+        "source": "Smith, Van Ness & Abbott, Tabla 12.5; problemas 12.20 y 12.22. Valores recomendados por Gmehling et al., DECHEMA.",
+        "type": "energy_difference",
+        "lambda_ij_minus_lambda_ii": 1448.01,
+        "value": 1448.01,
+        "units": "cal/mol"
+      },
+      "water|acetone": {
+        "source": "Smith, Van Ness & Abbott, Tabla 12.5; problemas 12.20 y 12.22. Valores recomendados por Gmehling et al., DECHEMA.",
+        "type": "energy_difference",
+        "lambda_ij_minus_lambda_ii": 291.27,
+        "value": 291.27,
+        "units": "cal/mol"
+      },
+      "methanol|water": {
+        "source": "Smith, Van Ness & Abbott, Tabla 12.5; problemas 12.20 y 12.22. Valores recomendados por Gmehling et al., DECHEMA.",
+        "type": "energy_difference",
+        "lambda_ij_minus_lambda_ii": 469.55,
+        "value": 469.55,
+        "units": "cal/mol"
+      },
+      "water|methanol": {
+        "source": "Smith, Van Ness & Abbott, Tabla 12.5; problemas 12.20 y 12.22. Valores recomendados por Gmehling et al., DECHEMA.",
+        "type": "energy_difference",
+        "lambda_ij_minus_lambda_ii": 107.38,
+        "value": 107.38,
+        "units": "cal/mol"
       }
     },
     "Margules": {
+      "acetone|methanol": {
+        "source": "Smith, Van Ness & Abbott, problema 12.3; Freshwater y Pike, J. Chem. Eng. Data, 12:179, 1967.",
+        "calculated_from_vle": true,
+        "calculated_at_utc": "2026-06-26T02:43:09+00:00",
+        "points_used": 6,
+        "residual_sum_squares": 0.39389128064402745,
+        "type": "dimensionless_a",
+        "value": 0.35579937369662606
+      },
+      "methanol|acetone": {
+        "source": "Smith, Van Ness & Abbott, problema 12.3; Freshwater y Pike, J. Chem. Eng. Data, 12:179, 1967.",
+        "calculated_from_vle": true,
+        "calculated_at_utc": "2026-06-26T02:43:09+00:00",
+        "points_used": 6,
+        "residual_sum_squares": 0.39389128064402745,
+        "type": "dimensionless_a",
+        "value": 0.18089297762975062
+      },
       "cyclohexane|n_heptane": {
         "source": "Punto VLE demostrativo ciclohexano/n-heptano derivado del problema 14.54(h) para validar ajuste automático. Sustituir por dato experimental para informe final.",
         "calculated_from_vle": true,
-        "calculated_at_utc": "2026-06-24T03:30:21+00:00",
+        "calculated_at_utc": "2026-06-26T02:45:20+00:00",
         "points_used": 1,
         "residual_sum_squares": 0.0,
         "type": "dimensionless_a",
@@ -180,7 +380,7 @@
       "n_heptane|cyclohexane": {
         "source": "Punto VLE demostrativo ciclohexano/n-heptano derivado del problema 14.54(h) para validar ajuste automático. Sustituir por dato experimental para informe final.",
         "calculated_from_vle": true,
-        "calculated_at_utc": "2026-06-24T03:30:21+00:00",
+        "calculated_at_utc": "2026-06-26T02:45:20+00:00",
         "points_used": 1,
         "residual_sum_squares": 0.0,
         "type": "dimensionless_a",
@@ -191,7 +391,7 @@
       "cyclohexane|n_heptane": {
         "source": "Punto VLE demostrativo ciclohexano/n-heptano derivado del problema 14.54(h) para validar ajuste automático. Sustituir por dato experimental para informe final.",
         "calculated_from_vle": true,
-        "calculated_at_utc": "2026-06-24T03:30:21+00:00",
+        "calculated_at_utc": "2026-06-26T02:45:20+00:00",
         "points_used": 1,
         "residual_sum_squares": 1.88079096131566e-35,
         "type": "dimensionless_a",
@@ -200,7 +400,7 @@
       "n_heptane|cyclohexane": {
         "source": "Punto VLE demostrativo ciclohexano/n-heptano derivado del problema 14.54(h) para validar ajuste automático. Sustituir por dato experimental para informe final.",
         "calculated_from_vle": true,
-        "calculated_at_utc": "2026-06-24T03:30:21+00:00",
+        "calculated_at_utc": "2026-06-26T02:45:20+00:00",
         "points_used": 1,
         "residual_sum_squares": 1.88079096131566e-35,
         "type": "dimensionless_a",
@@ -214,32 +414,257 @@
         "source": "Punto VLE demostrativo ciclohexano/n-heptano derivado del problema 14.54(h) para validar ajuste automático. Sustituir por dato experimental para informe final.",
         "temperature_k": 360.0,
         "pressure_kpa": 94.85152995052616,
-        "x": [0.45, 0.55],
-        "y": [0.5842238765160485, 0.41577612348395143]
+        "x": [
+          0.45,
+          0.55
+        ],
+        "y": [
+          0.5842238765160485,
+          0.41577612348395143
+        ]
+      }
+    ],
+    "acetone|methanol": [
+      {
+        "source": "Smith, Van Ness & Abbott, problema 12.3; Freshwater y Pike, J. Chem. Eng. Data, 12:179, 1967.",
+        "temperature_c": 55.0,
+        "pressure_kpa": 68.728,
+        "x": [
+          1e-06,
+          0.999999
+        ],
+        "y": [
+          1e-06,
+          0.999999
+        ]
+      },
+      {
+        "source": "Smith, Van Ness & Abbott, problema 12.3; Freshwater y Pike, J. Chem. Eng. Data, 12:179, 1967.",
+        "temperature_c": 55.0,
+        "pressure_kpa": 82.528,
+        "x": [
+          0.1452,
+          0.8548
+        ],
+        "y": [
+          0.2694,
+          0.7306
+        ]
+      },
+      {
+        "source": "Smith, Van Ness & Abbott, problema 12.3; Freshwater y Pike, J. Chem. Eng. Data, 12:179, 1967.",
+        "temperature_c": 55.0,
+        "pressure_kpa": 93.206,
+        "x": [
+          0.3579,
+          0.6421
+        ],
+        "y": [
+          0.4779,
+          0.5221
+        ]
+      },
+      {
+        "source": "Smith, Van Ness & Abbott, problema 12.3; Freshwater y Pike, J. Chem. Eng. Data, 12:179, 1967.",
+        "temperature_c": 55.0,
+        "pressure_kpa": 99.95,
+        "x": [
+          0.6605,
+          0.3395
+        ],
+        "y": [
+          0.6926,
+          0.3074
+        ]
+      },
+      {
+        "source": "Smith, Van Ness & Abbott, problema 12.3; Freshwater y Pike, J. Chem. Eng. Data, 12:179, 1967.",
+        "temperature_c": 55.0,
+        "pressure_kpa": 99.799,
+        "x": [
+          0.9448,
+          0.0552
+        ],
+        "y": [
+          0.9336,
+          0.0664
+        ]
+      },
+      {
+        "source": "Smith, Van Ness & Abbott, problema 12.3; Freshwater y Pike, J. Chem. Eng. Data, 12:179, 1967.",
+        "temperature_c": 55.0,
+        "pressure_kpa": 96.885,
+        "x": [
+          0.999999,
+          1e-06
+        ],
+        "y": [
+          0.999999,
+          1e-06
+        ]
       }
     ]
   },
   "templates": [
     {
+      "id": "benzene_carbon_tetrachloride",
+      "name": "Benceno / Tetracloruro de carbono",
+      "description": "Sistema Wilson directo documentado por Smith, Van Ness & Abbott, problema 14.54(a).",
+      "kind": "Wilson directo 14.54",
+      "component_ids": [
+        "benzene",
+        "carbon_tetrachloride"
+      ],
+      "available_models": [
+        "Wilson"
+      ]
+    },
+    {
+      "id": "benzene_cyclohexane",
+      "name": "Benceno / Ciclohexano",
+      "description": "Sistema Wilson directo documentado por Smith, Van Ness & Abbott, problema 14.54(b).",
+      "kind": "Wilson directo 14.54",
+      "component_ids": [
+        "benzene",
+        "cyclohexane"
+      ],
+      "available_models": [
+        "Wilson"
+      ]
+    },
+    {
+      "id": "benzene_n_heptane",
+      "name": "Benceno / n-Heptano",
+      "description": "Sistema Wilson directo documentado por Smith, Van Ness & Abbott, problema 14.54(c).",
+      "kind": "Wilson directo 14.54",
+      "component_ids": [
+        "benzene",
+        "n_heptane"
+      ],
+      "available_models": [
+        "Wilson"
+      ]
+    },
+    {
+      "id": "benzene_n_hexane",
+      "name": "Benceno / n-Hexano",
+      "description": "Sistema Wilson directo documentado por Smith, Van Ness & Abbott, problema 14.54(d).",
+      "kind": "Wilson directo 14.54",
+      "component_ids": [
+        "benzene",
+        "n_hexane"
+      ],
+      "available_models": [
+        "Wilson"
+      ]
+    },
+    {
+      "id": "carbon_tetrachloride_cyclohexane",
+      "name": "Tetracloruro de carbono / Ciclohexano",
+      "description": "Sistema Wilson directo documentado por Smith, Van Ness & Abbott, problema 14.54(e).",
+      "kind": "Wilson directo 14.54",
+      "component_ids": [
+        "carbon_tetrachloride",
+        "cyclohexane"
+      ],
+      "available_models": [
+        "Wilson"
+      ]
+    },
+    {
+      "id": "carbon_tetrachloride_n_heptane",
+      "name": "Tetracloruro de carbono / n-Heptano",
+      "description": "Sistema Wilson directo documentado por Smith, Van Ness & Abbott, problema 14.54(f).",
+      "kind": "Wilson directo 14.54",
+      "component_ids": [
+        "carbon_tetrachloride",
+        "n_heptane"
+      ],
+      "available_models": [
+        "Wilson"
+      ]
+    },
+    {
+      "id": "carbon_tetrachloride_n_hexane",
+      "name": "Tetracloruro de carbono / n-Hexano",
+      "description": "Sistema Wilson directo documentado por Smith, Van Ness & Abbott, problema 14.54(g).",
+      "kind": "Wilson directo 14.54",
+      "component_ids": [
+        "carbon_tetrachloride",
+        "n_hexane"
+      ],
+      "available_models": [
+        "Wilson"
+      ]
+    },
+    {
       "id": "cyclohexane_n_heptane",
       "name": "Ciclohexano / n-Heptano",
-      "description": "Plantilla binaria casi ideal con Wilson documentado.",
-      "kind": "Casi ideal",
-      "component_ids": ["cyclohexane", "n_heptane"]
+      "description": "Sistema Wilson directo documentado por Smith, Van Ness & Abbott, problema 14.54(h). Incluye punto VLE limitado para ajuste Margules/Van Laar.",
+      "kind": "Wilson directo 14.54 + VLE limitado",
+      "component_ids": [
+        "cyclohexane",
+        "n_heptane"
+      ],
+      "available_models": [
+        "Wilson",
+        "Margules",
+        "Van Laar"
+      ]
     },
     {
-      "id": "ethanol_toluene",
-      "name": "Etanol / Tolueno",
-      "description": "Plantilla binaria no ideal; requiere parámetros binarios antes de habilitar cálculos reales.",
-      "kind": "Azeotrópico",
-      "component_ids": ["ethanol", "toluene"]
+      "id": "cyclohexane_n_hexane",
+      "name": "Ciclohexano / n-Hexano",
+      "description": "Sistema Wilson directo documentado por Smith, Van Ness & Abbott, problema 14.54(i).",
+      "kind": "Wilson directo 14.54",
+      "component_ids": [
+        "cyclohexane",
+        "n_hexane"
+      ],
+      "available_models": [
+        "Wilson"
+      ]
     },
     {
-      "id": "acetone_methanol_benzene",
-      "name": "Acetona / Metanol / Benceno",
-      "description": "Plantilla ternaria; requiere parámetros Wilson documentados para cálculos reales.",
-      "kind": "Multicomponente",
-      "component_ids": ["acetone", "methanol", "benzene"]
+      "id": "acetone_methanol",
+      "name": "Acetona / Metanol",
+      "description": "Sistema binario con datos VLE del problema 12.3 para ajuste automático Margules. Van Laar no se habilita porque el ajuste inverso requiere ln(gamma) positivos en ambos componentes.",
+      "kind": "VLE experimental 12.3",
+      "component_ids": [
+        "acetone",
+        "methanol"
+      ],
+      "available_models": [
+        "Margules"
+      ]
+    },
+    {
+      "id": "water_n_pentane_n_heptane_1427",
+      "name": "Agua / n-Pentano / n-Heptano",
+      "description": "Problema 14.27: sistema VLLE con dos fases líquidas inmiscibles. Wilson se habilita solo por requerimiento; el método físicamente recomendado es Raoult ideal para la fase hidrocarburo + agua líquida separada.",
+      "kind": "Caso 14.27 — VLLE inmiscible, ejecutable solo en Wilson por requerimiento",
+      "component_ids": [
+        "water",
+        "n_pentane",
+        "n_heptane"
+      ],
+      "available_models": [
+        "Wilson"
+      ]
+    },
+    {
+      "id": "acetone_methanol_water_1220_1222",
+      "name": "Acetona / Metanol / Agua",
+      "description": "Sistema ternario Wilson documentado por Smith, Van Ness & Abbott, problemas 12.20 y 12.22, con parámetros energéticos de la Tabla 12.5.",
+      "kind": "Wilson energético Tabla 12.5",
+      "component_ids": [
+        "acetone",
+        "methanol",
+        "water"
+      ],
+      "available_models": [
+        "Wilson"
+      ]
     }
   ]
 }

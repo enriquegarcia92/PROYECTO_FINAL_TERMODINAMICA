@@ -43,7 +43,7 @@ def test_wilson_gamma_for_cyclohexane_heptane_is_finite() -> None:
     gamma = activity_coefficients(ActivityModel.WILSON, system, 360.0, np.array([0.5, 0.5]))
     assert gamma.shape == (2,)
     assert np.all(gamma > 0)
-    assert gamma[0] == pytest.approx(1.012251, rel=1e-5)
+    assert gamma[0] == pytest.approx(1.012276, rel=1e-5)
 
 
 def test_wilson_energy_difference_calculates_lambdas_from_temperature(tmp_path: Path) -> None:
@@ -160,13 +160,13 @@ def test_van_laar_without_vle_fit_data_is_blocked() -> None:
     service = ThermodynamicVLEService(repo)
     request = CalculationRequest(
         CalculationType.BUBL_T,
-        "ethanol_toluene",
+        "benzene_n_hexane",
         ActivityModel.VAN_LAAR,
         VaporModel.GAMMA_PHI,
         101.325,
         (0.5, 0.5),
     )
-    with pytest.raises(InputValidationError, match="Faltan datos VLE"):
+    with pytest.raises(InputValidationError, match="no está disponible"):
         service.calculate(request)
 
 
@@ -202,7 +202,7 @@ def test_bubl_t_real_wilson_gamma_phi_is_physical() -> None:
     assert sum(result.y) == pytest.approx(1.0)
 
 
-def test_bubl_t_uses_automatic_wilson_fit_from_vle_data() -> None:
+def test_bubl_t_uses_documented_wilson_direct_parameters() -> None:
     service = ThermodynamicVLEService(DataRepository())
     result = service.calculate(
         CalculationRequest(
@@ -219,4 +219,4 @@ def test_bubl_t_uses_automatic_wilson_fit_from_vle_data() -> None:
     assert result.temperature_k - 273.15 == pytest.approx(88.195, abs=0.03)
     assert result.y[0] == pytest.approx(0.630233, abs=2e-3)
     assert result.y[1] == pytest.approx(0.369767, abs=2e-3)
-    assert any("Punto VLE demostrativo" in source for source in result.data_sources)
+    assert any("problema 14.54" in source for source in result.data_sources)

@@ -76,7 +76,7 @@ def test_margules_fit_recovers_a12_a21_from_synthetic_vle_point(tmp_path: Path) 
 
 
 def test_margules_fit_rejects_non_binary_system() -> None:
-    system = DataRepository().get("acetone_methanol_benzene")
+    system = DataRepository().build_system(("acetone", "methanol", "benzene"))
 
     with pytest.raises(InputValidationError, match="sistemas binarios"):
         fit_margules_binary_from_vle(system, 330.0, 101.325, (0.5, 0.5), (0.5, 0.5))
@@ -106,14 +106,14 @@ def test_margules_without_vle_fit_data_stays_blocked() -> None:
     service = ThermodynamicVLEService(DataRepository())
     request = CalculationRequest(
         CalculationType.BUBL_T,
-        "ethanol_toluene",
+        "benzene_n_hexane",
         ActivityModel.MARGULES,
         VaporModel.GAMMA_PHI,
         101.325,
         (0.5, 0.5),
     )
 
-    with pytest.raises(InputValidationError, match="Faltan datos VLE"):
+    with pytest.raises(InputValidationError, match="no está disponible"):
         service.calculate(request)
 
 

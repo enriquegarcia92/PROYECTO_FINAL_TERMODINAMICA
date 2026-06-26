@@ -71,7 +71,7 @@ def test_service_blocks_when_vle_fit_data_is_missing(tmp_path: Path) -> None:
     db_path.write_text(json.dumps(source, indent=2, ensure_ascii=False), encoding="utf-8")
     service = ThermodynamicVLEService(DataRepository(db_path))
 
-    with pytest.raises(InputValidationError, match="Faltan datos VLE"):
+    with pytest.raises(InputValidationError, match="Ingrese datos VLE"):
         service.calculate(
             CalculationRequest(
                 CalculationType.BUBL_P,
@@ -82,3 +82,36 @@ def test_service_blocks_when_vle_fit_data_is_missing(tmp_path: Path) -> None:
                 (0.45, 0.55),
             )
         )
+
+
+def test_user_vle_fit_data_does_not_persist_to_json(tmp_path: Path) -> None:
+    db_path = _copy_database(tmp_path, clear_binary_parameters=True)
+    service = ThermodynamicVLEService(DataRepository(db_path))
+    user_fit_data = {
+        "cyclohexane|n_heptane": [
+            {
+                "source": "Usuario prueba",
+                "temperature_k": 360.0,
+                "pressure_kpa": 94.85152995052616,
+                "x": [0.45, 0.55],
+                "y": [0.5842238765160485, 0.41577612348395143],
+            }
+        ]
+    }
+
+    result = service.calculate(
+        CalculationRequest(
+            CalculationType.BUBL_P,
+            "cyclohexane_n_heptane",
+            ActivityModel.MARGULES,
+            VaporModel.COMPARE,
+            360.0,
+            (0.45, 0.55),
+            user_vle_fit_data=user_fit_data,
+        )
+    )
+
+    updated = json.loads(db_path.read_text(encoding="utf-8"))
+    assert result.converged
+    assert result.vle_fit_data_used[0]["source"] == "Usuario prueba"
+    assert updated["binary_parameters"]["Margules"] == {}
