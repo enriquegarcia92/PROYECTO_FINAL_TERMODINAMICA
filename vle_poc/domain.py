@@ -115,6 +115,7 @@ class CalculationResult:
     k_values: tuple[float, ...] = field(default_factory=tuple)
     data_sources: tuple[str, ...] = field(default_factory=tuple)
     vle_fit_data_used: tuple[dict[str, Any], ...] = field(default_factory=tuple)
+    azeotrope_analysis: dict[str, Any] = field(default_factory=dict)
 
     def assert_shape(self) -> None:
         """Comprueba que todos los vectores coincidan con los componentes."""

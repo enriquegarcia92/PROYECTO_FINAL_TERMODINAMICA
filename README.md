@@ -20,6 +20,7 @@ Esta documentación está escrita para Windows. Aunque el código pueda ejecutar
 - Ejemplos VLE precargados para algunos sistemas; se cargan explícitamente desde la interfaz si el usuario desea usarlos.
 - Comparación visual con `phi = 1`.
 - Diagramas Pxy/Txy generados automáticamente con cada cálculo y exportables a PNG/PDF mediante ventana “Guardar como”.
+- Detección automática de **azeótropos** en resultados y diagramas binarios gamma-phi cuando la curva predice `x≈y`.
 - Resultados exportables a TXT mediante ventana “Guardar como”.
 - Validaciones reales de composiciones, presión, temperatura y disponibilidad de parámetros.
 - CLI que consume el mismo contrato de dominio.
@@ -50,6 +51,11 @@ Sistemas con ejemplos VLE precargados:
 - Ciclohexano / n-Heptano, con punto VLE limitado de validación.
 - Acetona / Metanol, con datos VLE del problema 12.3.
 
+Sistemas de prueba de azeótropos desde la Guía EVL — Ley de Raoult Modificada:
+
+- Acetona / n-Hexano, problema 4.2.2, Margules de un parámetro `A=1.50` a 50 °C.
+- Etanol / Agua, problema 4.2.1, Margules de un parámetro `A=1.59` a 78 °C.
+
 Sistemas ternarios Wilson documentados:
 
 - Acetona / Metanol / Agua, problemas 12.20 y 12.22, con parámetros energéticos Wilson de la Tabla 12.5.
@@ -75,6 +81,18 @@ Reglas actuales:
 - En Metano / n-Butano el diagrama automático es P-x-y SRK a la temperatura ingresada; para reproducir el Ejemplo 14.2 use `37.78 °C` (`100 °F`).
 - En Nitrógeno / Metano el gráfico automático no es Pxy/Txy: muestra `φ_N2`, `φ_CH4` y `Z` contra composición de vapor. Si no hay valor tabulado de `Z` en la base, el programa lo calcula resolviendo la cúbica Redlich-Kwong `Z^3 - Z^2 + (A-B-B^2)Z - AB = 0`.
 - Si faltan Antoine, propiedades críticas, volumen líquido o parámetros binarios, el cálculo se bloquea con un mensaje amigable. El programa no inventa datos.
+
+## Azeótropos
+
+La escritura correcta es **azeótropo** en singular y **azeótropos** en plural. El programa no usa azeótropos como datos de entrada; los detecta a partir de los resultados calculados.
+
+- En cada resultado se revisa si el punto calculado cumple aproximadamente `x_i ≈ y_i`.
+- En diagramas binarios Pxy/Txy gamma-phi se busca un cruce interior de `y1 - x1 = 0`.
+- Si se detecta, el gráfico marca el punto estimado y el reporte TXT incluye composición y presión/temperatura.
+- En sistemas multicomponentes solo se muestra una evaluación local o de corte composicional, no una detección global del espacio completo.
+- En casos EOS como Nitrógeno / Metano con RK no aplica detección de azeótropos porque el gráfico es de fugacidad vapor, no Pxy/Txy.
+
+Para probar visualmente esta función use **Acetona / n-Hexano**, modelo **Margules**, cálculo **BUBL P**, `T = 50 °C`, `x1 ≈ 0.637`; o **Etanol / Agua**, modelo **Margules**, cálculo **BUBL P**, `T = 78 °C`, `x1 ≈ 0.762`.
 
 ## Parámetros Wilson
 

@@ -33,6 +33,7 @@ def test_gui_can_run_a_beta_calculation() -> None:
     assert window.stack.currentIndex() == 2
     assert window.results_page.content.isVisible() is False or window.results_page.content.isHidden() is False
     assert window.results_page.current_diagram is not None
+    assert "Azeótropos" in window.results_page.azeotropes.text()
     assert window.diagram_page.current_diagram is not None
     window.close()
     app.processEvents()

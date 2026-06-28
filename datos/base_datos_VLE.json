@@ -415,6 +415,26 @@
         "residual_sum_squares": 0.0,
         "type": "dimensionless_a",
         "value": 0.04528455126046451
+      },
+      "acetone|n_hexane": {
+        "source": "Guía EVL — Ley de Raoult Modificada, problema 4.2.2: acetona/n-hexano a 50 °C, Margules de un parámetro A=1.50.",
+        "type": "dimensionless_a",
+        "value": 1.5
+      },
+      "n_hexane|acetone": {
+        "source": "Guía EVL — Ley de Raoult Modificada, problema 4.2.2: acetona/n-hexano a 50 °C, Margules de un parámetro A=1.50.",
+        "type": "dimensionless_a",
+        "value": 1.5
+      },
+      "ethanol|water": {
+        "source": "Guía EVL — Ley de Raoult Modificada, problema 4.2.1: etanol/agua a 78 °C, Margules de un parámetro A=1.59.",
+        "type": "dimensionless_a",
+        "value": 1.59
+      },
+      "water|ethanol": {
+        "source": "Guía EVL — Ley de Raoult Modificada, problema 4.2.1: etanol/agua a 78 °C, Margules de un parámetro A=1.59.",
+        "type": "dimensionless_a",
+        "value": 1.59
       }
     },
     "Van Laar": {
@@ -663,6 +683,32 @@
       "component_ids": [
         "acetone",
         "methanol"
+      ],
+      "available_models": [
+        "Margules"
+      ]
+    },
+    {
+      "id": "acetone_n_hexane_azeotrope_guide",
+      "name": "Acetona / n-Hexano",
+      "description": "Sistema binario de prueba de azeótropo tomado de la Guía EVL — Ley de Raoult Modificada, problema 4.2.2. Usa Margules de un parámetro A=1.50 a 50 °C.",
+      "kind": "Guía Raoult modificada — azeótropo Margules 4.2.2",
+      "component_ids": [
+        "acetone",
+        "n_hexane"
+      ],
+      "available_models": [
+        "Margules"
+      ]
+    },
+    {
+      "id": "ethanol_water_azeotrope_guide",
+      "name": "Etanol / Agua",
+      "description": "Sistema binario clásico de prueba de azeótropo tomado de la Guía EVL — Ley de Raoult Modificada, problema 4.2.1. Usa Margules de un parámetro A=1.59 a 78 °C.",
+      "kind": "Guía Raoult modificada — azeótropo Margules 4.2.1",
+      "component_ids": [
+        "ethanol",
+        "water"
       ],
       "available_models": [
         "Margules"

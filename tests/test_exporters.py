@@ -39,6 +39,8 @@ def test_result_txt_contains_required_sections() -> None:
     assert "phi_sat" in text
     assert "Poynting" in text
     assert "Residuales finales" in text
+    assert "Analisis de azeotropos" in text
+    assert "no usa azeotropos como entrada" in text
     assert "Comparacion gamma-phi vs phi = 1" in text
     assert "Presiones de saturacion" in text
     assert "Valores K" in text
@@ -127,3 +129,4 @@ def test_nitrogen_methane_txt_reports_z_from_rk_cubic_when_table_is_missing() ->
     assert "Z_vapor" in text
     assert "phi_Nitrógeno" in text
     assert "phi_Metano" in text
+    assert "No aplicable" in text

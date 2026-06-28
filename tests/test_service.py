@@ -278,6 +278,40 @@ def test_phase_curve_for_result_generates_txy_for_pressure_fixed_calculation() -
     assert data["point_value"][0] == pytest.approx(result.temperature_k)
 
 
+@pytest.mark.parametrize(
+    ("system_id", "temperature_k", "expected_x"),
+    [
+        ("acetone_n_hexane_azeotrope_guide", 323.15, 0.6370234633764422),
+        ("ethanol_water_azeotrope_guide", 351.15, 0.7616936642292819),
+    ],
+)
+def test_guide_azeotrope_systems_detect_curve_azeotrope(
+    system_id: str,
+    temperature_k: float,
+    expected_x: float,
+) -> None:
+    service = ThermodynamicVLEService(DataRepository())
+    result = service.calculate(
+        CalculationRequest(
+            CalculationType.BUBL_P,
+            system_id,
+            ActivityModel.MARGULES,
+            VaporModel.COMPARE,
+            temperature_k,
+            (expected_x, 1.0 - expected_x),
+        )
+    )
+
+    assert result.converged
+    assert result.activity_model == "Margules"
+    assert result.azeotrope_analysis["near_azeotrope"] is True
+
+    diagram = service.phase_curve_for_result(result)
+    curve = diagram["azeotrope_curve"]
+    assert curve["detected"] is True
+    assert curve["x1"] == pytest.approx(expected_x, abs=0.04)
+
+
 def test_methane_n_butane_srk_bubl_p_and_diagram() -> None:
     service = ThermodynamicVLEService(DataRepository())
     result = service.calculate(

@@ -13,6 +13,8 @@ def test_systems_declare_only_available_models() -> None:
     assert repository.get("benzene_n_hexane").available_models == ("Wilson",)
     assert repository.get("cyclohexane_n_heptane").available_models == ("Wilson", "Margules", "Van Laar")
     assert repository.get("acetone_methanol").available_models == ("Margules",)
+    assert repository.get("acetone_n_hexane_azeotrope_guide").available_models == ("Margules",)
+    assert repository.get("ethanol_water_azeotrope_guide").available_models == ("Margules",)
 
 
 def test_component_catalog_is_loaded() -> None:
@@ -84,3 +86,21 @@ def test_wilson_125_parameters_are_loaded_for_acetone_methanol_water() -> None:
         assert pairs[pair_key]["type"] == "energy_difference"
         assert pairs[pair_key]["units"] == "cal/mol"
         assert pairs[pair_key]["value"] == value
+
+
+def test_guide_azeotrope_margules_parameters_are_loaded() -> None:
+    repository = DataRepository()
+
+    acetone_hexane = repository.get("acetone_n_hexane_azeotrope_guide")
+    pairs = acetone_hexane.binary_parameters["Margules"]["pairs"]
+    assert tuple(component.id for component in acetone_hexane.components) == ("acetone", "n_hexane")
+    assert pairs["acetone|n_hexane"]["value"] == 1.5
+    assert pairs["n_hexane|acetone"]["value"] == 1.5
+    assert "problema 4.2.2" in pairs["acetone|n_hexane"]["source"]
+
+    ethanol_water = repository.get("ethanol_water_azeotrope_guide")
+    pairs = ethanol_water.binary_parameters["Margules"]["pairs"]
+    assert tuple(component.id for component in ethanol_water.components) == ("ethanol", "water")
+    assert pairs["ethanol|water"]["value"] == 1.59
+    assert pairs["water|ethanol"]["value"] == 1.59
+    assert "problema 4.2.1" in pairs["ethanol|water"]["source"]

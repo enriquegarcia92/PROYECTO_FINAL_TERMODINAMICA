@@ -8,6 +8,7 @@ import numpy as np
 from scipy.optimize import brentq
 
 from .activity import activity_coefficients
+from .azeotrope import analyze_result_point, detect_binary_curve_azeotrope
 from .cubic_eos import bubble_pressure_phi_phi, vapor_fugacity_result
 from .domain import ActivityModel, CalculationRequest, CalculationResult, CalculationType, SystemDefinition, VaporModel
 from .fugacity import phi_mixture, phi_sat_pitzer, poynting_factor
@@ -64,7 +65,6 @@ class ThermodynamicVLEService:
         user_supplied_fit_data = bool(request.user_vle_fit_data)
         if (
             not user_supplied_fit_data
-            and request.activity_model is ActivityModel.WILSON
             and self._has_required_parameters(
                 system, request.activity_model
             )
@@ -194,6 +194,11 @@ class ThermodynamicVLEService:
                 psat_kpa=(),
                 k_values=eos_result.k_values,
                 data_sources=sources,
+                azeotrope_analysis={
+                    "applicable": False,
+                    "status": "No aplicable",
+                    "message": "No aplicable: este cálculo EOS phi-phi no corresponde a un diagrama Pxy/Txy gamma-phi.",
+                },
             )
             result.assert_shape()
             return result
@@ -234,6 +239,11 @@ class ThermodynamicVLEService:
                 psat_kpa=(),
                 k_values=(),
                 data_sources=("Smith, Van Ness & Abbott, Ejemplo 14.1; Redlich-Kwong para N2/CH4.", system.description),
+                azeotrope_analysis={
+                    "applicable": False,
+                    "status": "No aplicable",
+                    "message": "No aplicable: este cálculo RK reporta fugacidad vapor y factor Z, no equilibrio azeotrópico Pxy/Txy.",
+                },
             )
             result.assert_shape()
             return result
@@ -502,6 +512,28 @@ class ThermodynamicVLEService:
             k_values=tuple(float(value) for value in k),
             data_sources=sources,
             vle_fit_data_used=self._flatten_fit_data(request.user_vle_fit_data),
+            azeotrope_analysis=analyze_result_point(
+                CalculationResult(
+                    calculation_type=request.calculation_type.value,
+                    system_name=system.name,
+                    component_names=tuple(component.name for component in system.components),
+                    temperature_k=float(temperature_k),
+                    pressure_kpa=float(pressure_kpa),
+                    x=tuple(float(value) for value in x),
+                    y=tuple(float(value) for value in y),
+                    gamma=tuple(float(value) for value in gamma),
+                    phi=tuple(float(value) for value in phi),
+                    phi_sat=tuple(float(value) for value in phi_sat),
+                    poynting=tuple(float(value) for value in poynting),
+                    iterations=len(history),
+                    converged=residual <= max(request.tolerance, 1e-6),
+                    residuals={},
+                    warnings=(),
+                    message="",
+                    activity_model=request.activity_model.value,
+                    vapor_model=request.vapor_model.value,
+                )
+            ),
         )
         result.assert_shape()
         return result
@@ -549,14 +581,18 @@ class ThermodynamicVLEService:
                 vapor_axis.append(result.y[0])
         ylabel = "Presión (kPa)" if diagram_type == "Pxy" else "Temperatura (K)"
         condition = f"T = {fixed_value:.2f} °C" if diagram_type == "Pxy" else f"P = {fixed_value:.2f} kPa"
-        return {
+        data = {
             "x": xs,
             "y": np.asarray(vapor_axis),
             "liquid": np.asarray(liquid_values),
             "vapor": np.asarray(liquid_values),
             "ylabel": np.asarray([ylabel]),
             "title": np.asarray([f"{diagram_type} — {system.name} — {condition}"]),
+            "diagram_type": np.asarray([diagram_type]),
+            "is_cut": np.asarray([0]),
         }
+        data["azeotrope_curve"] = detect_binary_curve_azeotrope(data)
+        return data
 
     def phase_curve_for_result(self, result: CalculationResult) -> dict[str, np.ndarray]:
         component_ids = self._component_ids_from_result(result)
@@ -608,7 +644,7 @@ class ThermodynamicVLEService:
             if len(component_ids) == 2
             else " — Corte composicional: se mantienen proporciones relativas de los demás componentes"
         )
-        return {
+        data = {
             "x": xs,
             "y": np.asarray(vapor_axis),
             "liquid": np.asarray(liquid_values),
@@ -622,6 +658,8 @@ class ThermodynamicVLEService:
             "diagram_type": np.asarray([diagram_type]),
             "is_cut": np.asarray([1 if len(component_ids) > 2 else 0]),
         }
+        data["azeotrope_curve"] = detect_binary_curve_azeotrope(data)
+        return data
 
     def _rk_fugacity_curve_for_result(
         self,
@@ -647,7 +685,7 @@ class ThermodynamicVLEService:
             phi_second.append(float(state.phi[1]))
             z_values.append(float(state.z))
         point_y = float(result.y[0])
-        return {
+        data = {
             "x": y1_values,
             "phi_first": np.asarray(phi_first),
             "phi_second": np.asarray(phi_second),
@@ -671,6 +709,8 @@ class ThermodynamicVLEService:
             "diagram_type": np.asarray(["Fugacidad RK"]),
             "is_cut": np.asarray([0]),
         }
+        data["azeotrope_curve"] = detect_binary_curve_azeotrope(data)
+        return data
 
     @staticmethod
     def _composition_for_cut(x1: float, base_composition: tuple[float, ...]) -> tuple[float, ...]:

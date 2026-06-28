@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from .azeotrope import detect_binary_curve_azeotrope
 from .domain import CalculationResult
 from .service import SIMULATION_WARNING
 from .units import kelvin_to_celsius
 
 
-def format_result_txt(result: CalculationResult) -> str:
+def format_result_txt(result: CalculationResult, diagram_data: dict[str, object] | None = None) -> str:
     """Construye el reporte TXT de un resultado VLE.
 
     El formato se mantiene deliberadamente simple para que pueda abrirse en
@@ -73,6 +74,30 @@ def format_result_txt(result: CalculationResult) -> str:
         lines.extend(f"- {warning}" for warning in result.warnings)
     else:
         lines.append("- Sin advertencias adicionales.")
+
+    lines.extend(["", "Analisis de azeotropos", "-" * 24])
+    point = result.azeotrope_analysis or {}
+    lines.append("Nota: el programa no usa azeotropos como entrada; los detecta a partir de x≈y.")
+    lines.append(str(point.get("message", "Analisis local no disponible.")))
+    if "abs_x1_minus_y1" in point:
+        lines.append(f"|x1-y1|: {float(point['abs_x1_minus_y1']):.6e}")
+    elif "max_abs_x_minus_y" in point:
+        lines.append(f"max |xi-yi|: {float(point['max_abs_x_minus_y']):.6e}")
+    if "tolerance" in point:
+        lines.append(f"Tolerancia punto: {float(point['tolerance']):.6e}")
+    curve = diagram_data.get("azeotrope_curve") if diagram_data else None
+    if not isinstance(curve, dict) and diagram_data is not None:
+        curve = detect_binary_curve_azeotrope(diagram_data)
+    if isinstance(curve, dict):
+        lines.append(str(curve.get("message", "Deteccion en curva no disponible.")))
+        if curve.get("detected"):
+            lines.append(f"Diagrama: {curve.get('diagram_type', '')}")
+            lines.append(f"x1≈y1: {float(curve['x1']):.6f}")
+            lines.append(f"{curve.get('value_label', 'Variable')}: {float(curve['value']):.6f}")
+            if "tolerance" in curve:
+                lines.append(f"Tolerancia curva: {float(curve['tolerance']):.6e}")
+    else:
+        lines.append("Deteccion en curva no incluida en este reporte.")
 
     if result.comparison_value is not None and result.comparison_label is not None:
         target = result.pressure_kpa if "Presion" in result.comparison_label or "Presión" in result.comparison_label else result.temperature_k

@@ -144,6 +144,20 @@ def draw_phase_curve(figure: Figure, data: dict[str, object]) -> None:
         axes.axhline(point_value, color="#6d858a", linestyle="--", linewidth=1.0, alpha=0.75)
         axes.axvline(point_x, color="#167467", linestyle=":", linewidth=1.0, alpha=0.75)
         axes.axvline(point_y, color="#d58a35", linestyle=":", linewidth=1.0, alpha=0.75)
+    curve_azeotrope = data.get("azeotrope_curve")
+    if isinstance(curve_azeotrope, dict) and curve_azeotrope.get("detected"):
+        x_az = float(curve_azeotrope["x1"])
+        value_az = float(curve_azeotrope["value"])
+        axes.scatter([x_az], [value_az], color="#7b2cbf", s=70, marker="D", zorder=6, label="Azeótropo")
+        axes.axvline(x_az, color="#7b2cbf", linestyle="--", linewidth=1.0, alpha=0.8)
+        axes.annotate(
+            f"Azeótropo\nx≈y={x_az:.3f}",
+            xy=(x_az, value_az),
+            xytext=(10, 12),
+            textcoords="offset points",
+            color="#4b1d78",
+            fontsize=9,
+        )
     axes.set_xlabel(str(data.get("xlabel", ["Fracción molar del componente 1"])[0]))
     axes.set_ylabel(str(data["ylabel"][0]))
     axes.set_title(str(data["title"][0]))
@@ -695,6 +709,10 @@ class ResultsPage(QWidget):
         self.residuals = QLabel()
         self.residuals.setWordWrap(True)
         content_layout.addWidget(self.residuals)
+        self.azeotropes = QLabel()
+        self.azeotropes.setObjectName("warningBanner")
+        self.azeotropes.setWordWrap(True)
+        content_layout.addWidget(self.azeotropes)
         self.comparison = QLabel()
         self.comparison.setObjectName("warningBanner")
         self.comparison.setWordWrap(True)
@@ -747,6 +765,7 @@ class ResultsPage(QWidget):
                 self.table.setItem(row, column, item)
         residual_text = " · ".join(f"{key}: {value:.2e}" for key, value in result.residuals.items())
         self.residuals.setText(f"<b>Residuales finales:</b> {residual_text}")
+        self.azeotropes.setText(self._azeotrope_text(result, None))
         if result.comparison_value is not None:
             target = result.pressure_kpa if "Presión" in (result.comparison_label or "") else result.temperature_k
             delta = 100 * (target - result.comparison_value) / target
@@ -785,6 +804,7 @@ class ResultsPage(QWidget):
             self.diagram_message.show()
         else:
             self.diagram_message.hide()
+        self.azeotropes.setText(self._azeotrope_text(result, self.current_diagram))
         draw_phase_curve(self.figure, self.current_diagram)
         self.canvas.draw()
         self.diagram_ready.emit(self.current_diagram)
@@ -812,7 +832,7 @@ class ResultsPage(QWidget):
         if target.suffix.lower() != ".txt":
             target = target.with_suffix(".txt")
         try:
-            target.write_text(format_result_txt(self.current_result), encoding="utf-8")
+            target.write_text(format_result_txt(self.current_result, self.current_diagram), encoding="utf-8")
         except OSError as exc:
             QMessageBox.critical(
                 self,
@@ -821,6 +841,34 @@ class ResultsPage(QWidget):
             )
             return
         QMessageBox.information(self, "Resultados guardados", f"Archivo creado en:\n{target}")
+
+    @staticmethod
+    def _azeotrope_text(result: CalculationResult, diagram: dict[str, object] | None) -> str:
+        point = result.azeotrope_analysis or {}
+        lines = ["<b>Azeótropos</b>"]
+        point_line = str(point.get("message", "Análisis local no disponible."))
+        if "abs_x1_minus_y1" in point:
+            point_line += f" <span style='white-space: nowrap;'>|x1-y1| = {float(point['abs_x1_minus_y1']):.3e}</span>."
+        elif "max_abs_x_minus_y" in point:
+            point_line += f" <span style='white-space: nowrap;'>Máx |xi-yi| = {float(point['max_abs_x_minus_y']):.3e}</span>."
+        lines.append(f"• <b>Punto calculado:</b> {point_line}")
+        if diagram is None:
+            lines.append("• <b>Curva:</b> Detección pendiente de generar diagrama automático.")
+            return "<br>".join(lines)
+        curve = diagram.get("azeotrope_curve")
+        if not isinstance(curve, dict):
+            lines.append("• <b>Curva:</b> Detección no disponible.")
+            return "<br>".join(lines)
+        curve_line = str(curve.get("message", ""))
+        if curve.get("detected"):
+            value_label = str(curve.get("value_label", "Variable"))
+            curve_line += (
+                " "
+                f"{value_label}: {float(curve['value']):.6f}; "
+                f"<span style='white-space: nowrap;'>x1≈y1={float(curve['x1']):.6f}</span>."
+            )
+        lines.append(f"• <b>Curva:</b> {curve_line}")
+        return "<br>".join(lines)
 
     def save_diagram(self, extension: str) -> None:
         if self.current_diagram is None:
